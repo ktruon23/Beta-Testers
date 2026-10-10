@@ -27,7 +27,10 @@ import os
 
 import anthropic
 import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+
+load_dotenv()  # reads ANTHROPIC_API_KEY (and the *_URL overrides) from .env
 
 from shared.llm import MODEL, llm_available
 from shared.schemas import (
@@ -93,6 +96,7 @@ class Run:
         self.client, self.req = client, req
         self.start_id, self.finish_id = start_id, finish_id
         self.trace: list[TraceEntry] = []
+        self.critic_feedback: dict | None = None  # last verdict, so the Planner can push back on it
 
     def log(self, sender, receiver, summary, payload=None):
         self.trace.append(TraceEntry(step=len(self.trace) + 1, sender=sender, receiver=receiver,
@@ -107,6 +111,7 @@ class Run:
             "climber": self.req.climber.model_dump(),
             "avoid_holds": sorted(avoid_holds - {self.start_id, self.finish_id}),
             "avoid_moves": avoid_moves,
+            "critic_feedback": self.critic_feedback,
         }))
         if plan.ok:
             path_str = " -> ".join(f"#{p}" for p in plan.path)
@@ -126,7 +131,10 @@ class Run:
             "finish_id": self.finish_id,
             "round": rnd,
             "max_rounds": self.req.max_rounds,
+            "planner_pushback": plan.pushback.model_dump() if plan.pushback else None,
         }))
+        self.critic_feedback = {"reasoning": crit.reasoning, "avoid_holds": crit.avoid_holds,
+                                "avoid_moves": crit.avoid_moves}
         verdict = "APPROVED" if crit.approved else "REJECTED"
         self.log("Critic", "Orchestrator", f"{verdict}: {crit.reasoning}",
                  {"avoid_holds": crit.avoid_holds, "avoid_moves": crit.avoid_moves, "source": crit.source})
