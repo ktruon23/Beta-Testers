@@ -106,15 +106,99 @@ def _call_claude(system: str, user: str, tool: dict, max_tokens: int) -> dict:
     import anthropic  # imported here so agents without an LLM don't need it
 
     client = anthropic.Anthropic()
+    # Newer Claude models reject a forced tool_choice, so ask with "auto" and say so in the prompt.
     response = client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=max_tokens,
-        system=system,
+        system=f"{system}\n\nAnswer only by calling the {tool['name']} tool.",
         messages=[{"role": "user", "content": user}],
         tools=[tool],
-        tool_choice={"type": "tool", "name": tool["name"]},
+        tool_choice={"type": "auto"},
     )
     for block in response.content:
         if block.type == "tool_use":
             return block.input
-    raise RuntimeError("Claude did not return a structured answer")
+    text = "".join(b.text for b in response.content if b.type == "text")
+    return _json_from_text(text)
+
+
+# ---------------------------------------------------------------- multi-step agent loop
+
+def run_agent(system: str, user: str, tools: list[dict], execute, finish_tool: str,
+              max_steps: int = 20, max_tokens: int = 4000) -> dict:
+    """Let the model call tools until it calls `finish_tool`; return that call's input.
+
+    `execute(name, args) -> str` runs every other tool; its text goes back to the model.
+    """
+    if backend() == "brev":
+        return _agent_openai_compatible(system, user, tools, execute, finish_tool, max_steps, max_tokens)
+    return _agent_claude(system, user, tools, execute, finish_tool, max_steps, max_tokens)
+
+
+def _agent_openai_compatible(system, user, tools, execute, finish_tool, max_steps, max_tokens) -> dict:
+    import httpx
+
+    model = LLM_MODEL or _first_served_model()
+    headers = {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
+    fn_tools = [{"type": "function", "function": {
+        "name": t["name"], "description": t.get("description", ""), "parameters": t["input_schema"],
+    }} for t in tools]
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+    for step in range(max_steps):
+        # On the last step, force the final answer so the loop always ends with one.
+        choice = ({"type": "function", "function": {"name": finish_tool}}
+                  if step == max_steps - 1 else "auto")
+        body = {"model": model, "max_tokens": max_tokens, "temperature": 0.2,
+                "messages": messages, "tools": fn_tools, "tool_choice": choice}
+        r = httpx.post(f"{LLM_BASE_URL}/chat/completions", json=body, headers=headers, timeout=LLM_TIMEOUT)
+        if r.status_code >= 400:
+            raise RuntimeError(f"LLM server returned {r.status_code}: {r.text[:300]}")
+        message = r.json()["choices"][0]["message"]
+        calls = message.get("tool_calls") or []
+        if not calls:
+            # Some servers answer in plain text; accept it if it is the final JSON.
+            if message.get("content"):
+                return _json_from_text(message["content"])
+            raise RuntimeError("Model stopped without calling a tool")
+
+        messages.append({"role": "assistant", "content": message.get("content") or "", "tool_calls": calls})
+        for call in calls:
+            name = call["function"]["name"]
+            args = call["function"]["arguments"]
+            args = json.loads(args or "{}") if isinstance(args, str) else (args or {})
+            if name == finish_tool:
+                return args
+            try:
+                result = execute(name, args)
+            except Exception as e:  # report to the model so it can retry
+                result = f"Error: {type(e).__name__}: {e}"
+            messages.append({"role": "tool", "tool_call_id": call["id"], "content": result})
+    raise RuntimeError(f"Agent did not call {finish_tool} within {max_steps} steps")
+
+
+def _agent_claude(system, user, tools, execute, finish_tool, max_steps, max_tokens) -> dict:
+    import anthropic
+
+    client = anthropic.Anthropic()
+    messages = [{"role": "user", "content": user}]
+    for _ in range(max_steps):
+        # "auto": newer Claude models reject a forced tool_choice.
+        response = client.messages.create(model=CLAUDE_MODEL, max_tokens=max_tokens, system=system,
+                                          messages=messages, tools=tools, tool_choice={"type": "auto"})
+        messages.append({"role": "assistant", "content": response.content})
+        tool_uses = [b for b in response.content if b.type == "tool_use"]
+        if not tool_uses:
+            messages.append({"role": "user", "content": f"Call {finish_tool} now with your final answer."})
+            continue
+        results = []
+        for tu in tool_uses:
+            if tu.name == finish_tool:
+                return tu.input
+            try:
+                result = execute(tu.name, tu.input)
+            except Exception as e:
+                result = f"Error: {type(e).__name__}: {e}"
+            results.append({"type": "tool_result", "tool_use_id": tu.id, "content": result})
+        messages.append({"role": "user", "content": results})
+    raise RuntimeError(f"Agent did not call {finish_tool} within {max_steps} steps")

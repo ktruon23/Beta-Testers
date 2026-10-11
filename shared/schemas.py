@@ -129,6 +129,15 @@ class CoachRequest(BaseModel):
     plan: PlanResponse
     holds: list[Hold]
     climber: Climber
+    user_id: str = "guest"  # whose attempt history the Coach looks up
+
+
+class FeedbackRequest(BaseModel):
+    """A climber reporting whether one move worked, for the Coach's memory."""
+    user_id: str = "guest"
+    move: Move
+    success: bool
+    notes: str = ""
 
 
 class BetaStep(BaseModel):
