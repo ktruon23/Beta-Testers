@@ -6,7 +6,7 @@ the Orchestrator's /solve, so every stage can be shown live as it happens. The r
 logic mirrors orchestrator.solve(); keep the two in sync if you change one.
 
 Every step yields an Event:
-    stage   "detect" | "filter" | "plan" | "critique" | "coach" | "done" | "error"
+    stage   "detect" | "filter" | "holds" | "plan" | "critique" | "grade" | "coach" | "done" | "error"
     status  "running" | "done" | "failed"
     title   one line for a status header
     detail  the agent's "thinking": reasoning, strategy, alternatives, pushback...
@@ -15,6 +15,7 @@ Every step yields an Event:
 CLI (prints the live log in the terminal):
     cd agent-viewer
     python pipeline.py wall.jpg --height 68 --wingspan 70 --level beginner
+    python pipeline.py wall.jpg --hold-types 3=crimp,5=sloper --default-hold jug
 """
 
 from __future__ import annotations
@@ -32,6 +33,10 @@ PLANNER_URL = os.environ.get("PLANNER_URL", "http://localhost:8002")
 CRITIC_URL = os.environ.get("CRITIC_URL", "http://localhost:8003")
 COACH_URL = os.environ.get("COACH_URL", "http://localhost:8004")
 TIMEOUT = httpx.Timeout(90.0)
+
+# Mirrors shared/schemas.py: unclassified holds are assumed to be DEFAULT_HOLD_TYPE.
+HOLD_TYPES = ("jug", "pinch", "pocket", "crimp", "sloper")
+DEFAULT_HOLD_TYPE = "jug"
 
 
 @dataclass
@@ -99,6 +104,46 @@ def explain_plan(plan: dict) -> list[str]:
     return lines
 
 
+def parse_hold_types(text: str) -> dict[int, str]:
+    """"3=crimp, 5=sloper" -> {3: "crimp", 5: "sloper"}. Raises ValueError on bad input."""
+    out: dict[int, str] = {}
+    for part in filter(None, (p.strip() for p in (text or "").replace(";", ",").split(","))):
+        hold_id, sep, kind = part.partition("=")
+        kind = kind.strip().lower()
+        if not sep or not hold_id.strip().isdigit() or kind not in HOLD_TYPES:
+            raise ValueError(f"'{part}' should look like 3=crimp (types: {', '.join(HOLD_TYPES)})")
+        out[int(hold_id)] = kind
+    return out
+
+
+def apply_hold_types(holds: list[dict], hold_types: dict[int, str],
+                     default: str) -> tuple[list[dict], list[int]]:
+    """Same rule as orchestrator.apply_hold_types: user's type, then Vision's, then the default."""
+    out, assumed = [], []
+    for h in holds:
+        if h["id"] in hold_types:
+            t = hold_types[h["id"]]
+        elif (h.get("type") or "").lower() in HOLD_TYPES:
+            t = h["type"].lower()
+        else:
+            t = default
+            assumed.append(h["id"])
+        out.append({**h, "type": t})
+    return out, assumed
+
+
+def explain_difficulty(diff: dict) -> list[str]:
+    counts = ", ".join(f"{n} {t}{'s' if n != 1 else ''}" for t, n in diff.get("hold_counts", {}).items())
+    lines = [f"{diff['grade']} ({diff['label']}, score {diff['score']}, {diff['source']}).",
+             f"Holds on route: {counts}."]
+    if diff.get("reasoning"):
+        lines.append(f"Thinking: {diff['reasoning']}")
+    if diff.get("assumed_holds"):
+        lines.append(f"Assumed {diff['default_hold_type']}: " +
+                     ", ".join(f"#{i}" for i in diff["assumed_holds"]) + ". Set their real types to sharpen the grade.")
+    return lines
+
+
 def explain_critique(crit: dict) -> list[str]:
     lines = [f"{'Approved' if crit['approved'] else 'Rejected'} ({crit['source']}).",
              f"Thinking: {crit['reasoning']}"]
@@ -116,7 +161,9 @@ def explain_critique(crit: dict) -> list[str]:
 def run(image_bytes: bytes, climber: dict, route_color: Optional[str] = None,
         start_id: Optional[int] = None, finish_id: Optional[int] = None,
         inches_per_pixel: Optional[float] = None, min_conf: float = 0.5,
-        max_rounds: int = 4, detection: Optional[dict] = None) -> Iterator[Event]:
+        max_rounds: int = 4, detection: Optional[dict] = None,
+        hold_types: Optional[dict[int, str]] = None,
+        default_hold_type: str = DEFAULT_HOLD_TYPE) -> Iterator[Event]:
     """Run the agents, yielding an Event per step. Pass `detection` to reuse an earlier /detect result."""
     with httpx.Client(timeout=TIMEOUT) as client:
         try:
@@ -141,6 +188,19 @@ def run(image_bytes: bytes, climber: dict, route_color: Optional[str] = None,
                     return
                 yield Event("filter", "done", f"Kept {len(holds)} {route_color} holds",
                             [f"Hold ids now run 0-{len(holds) - 1}, bottom to top."], {"holds": holds})
+
+            # 2b. Hold types: the camera often can't see them, so fill in the user's or the default.
+            hold_types = hold_types or {}
+            bad = sorted(set(hold_types) - {h["id"] for h in holds})
+            if bad:
+                yield Event("error", "failed", f"Hold types set for holds {bad}, which aren't on this route",
+                            [f"Valid ids: 0-{len(holds) - 1}."])
+                return
+            holds, assumed = apply_hold_types(holds, hold_types, default_hold_type)
+            detail = [f"{len(assumed)} hold(s) with no known type are treated as {default_hold_type}s."]
+            if hold_types:
+                detail.append("You set: " + ", ".join(f"#{i} {t}" for i, t in sorted(hold_types.items())) + ".")
+            yield Event("holds", "done", "Hold types set", detail, {"holds": holds, "assumed_holds": assumed})
 
             ipp = inches_per_pixel or det.get("inches_per_pixel")
             if not ipp:
@@ -208,7 +268,19 @@ def run(image_bytes: bytes, climber: dict, route_color: Optional[str] = None,
             else:
                 status = f"Hit the {max_rounds}-round limit; using the last route."
 
-            # 4. Coach
+            # 4. Critic grades the final route from its hold types and reach
+            difficulty = None
+            yield Event("grade", "running", "Critic is grading the route's difficulty...")
+            try:
+                difficulty = _post(client, f"{CRITIC_URL}/difficulty", {
+                    "plan": last_good, "holds": holds, "climber": climber,
+                    "assumed_holds": assumed, "default_hold_type": default_hold_type})
+                yield Event("grade", "done", f"Critic graded the route {difficulty['grade']}",
+                            explain_difficulty(difficulty), difficulty)
+            except (httpx.HTTPError, RuntimeError) as e:
+                yield Event("grade", "failed", "Critic could not grade the route", [str(e)])
+
+            # 5. Coach
             yield Event("coach", "running", "Coach is writing move-by-move beta...")
             try:
                 beta = _post(client, f"{COACH_URL}/beta", {"plan": last_good, "holds": holds, "climber": climber})
@@ -221,6 +293,7 @@ def run(image_bytes: bytes, climber: dict, route_color: Optional[str] = None,
 
             yield Event("done", "done", status, data={
                 "plan": last_good, "holds": holds, "approved": approved, "beta": beta,
+                "difficulty": difficulty,
                 "start_id": start, "finish_id": finish, "detection": det})
 
         except (httpx.HTTPError, RuntimeError) as e:
@@ -230,7 +303,8 @@ def run(image_bytes: bytes, climber: dict, route_color: Optional[str] = None,
 # ---------------------------------------------------------------- terminal mode
 
 ICONS = {"running": "...", "done": "OK ", "failed": "!! "}
-NAMES = {"detect": "VISION", "filter": "ORCH", "plan": "PLANNER", "critique": "CRITIC",
+NAMES = {"detect": "VISION", "filter": "ORCH", "holds": "ORCH", "plan": "PLANNER", "critique": "CRITIC",
+         "grade": "CRITIC",
          "coach": "COACH", "done": "DONE", "error": "ERROR"}
 
 if __name__ == "__main__":
@@ -242,12 +316,17 @@ if __name__ == "__main__":
     ap.add_argument("--level", default="intermediate", choices=["beginner", "intermediate", "expert"],
                     help="Climbing experience: beginner, intermediate or expert")
     ap.add_argument("--rounds", type=int, default=4)
+    ap.add_argument("--hold-types", default="", type=parse_hold_types,
+                    help="Known hold types by id, e.g. 3=crimp,5=sloper (ids after --color filtering)")
+    ap.add_argument("--default-hold", default=DEFAULT_HOLD_TYPE, choices=HOLD_TYPES,
+                    help="Type assumed for every hold you don't set (default: jug)")
     args = ap.parse_args()
 
     with open(args.image, "rb") as f:
         img = f.read()
     climber = {"height_in": args.height, "wingspan_in": args.wingspan, "level": args.level}
-    for ev in run(img, climber, route_color=args.color, max_rounds=args.rounds):
+    for ev in run(img, climber, route_color=args.color, max_rounds=args.rounds,
+                  hold_types=args.hold_types, default_hold_type=args.default_hold):
         print(f"[{ICONS[ev.status]}] {NAMES[ev.stage]:<8} {ev.title}")
         for line in ev.detail:
             print(f"             {line}")

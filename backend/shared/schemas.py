@@ -5,7 +5,18 @@ over HTTP. New Planner Agent fields are optional for backward compatibility.
 """
 
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Hold types the agents understand. The camera usually can't tell them apart, so
+# any hold Vision can't classify is treated as DEFAULT_HOLD_TYPE unless the user says otherwise.
+HoldType = Literal["jug", "pinch", "pocket", "crimp", "sloper"]
+HOLD_TYPES: tuple[str, ...] = ("jug", "pinch", "pocket", "crimp", "sloper")
+DEFAULT_HOLD_TYPE = "jug"  # the standard gym hold; most routes are set mostly on jugs
+
+
+def _clean_hold_types(v: dict) -> dict:
+    """Lowercase user-typed hold types ("Crimp" -> "crimp") before validation."""
+    return {k: t.strip().lower() if isinstance(t, str) else t for k, t in (v or {}).items()}
 
 
 class Hold(BaseModel):
@@ -56,6 +67,27 @@ class DetectResponse(BaseModel):
     inches_per_pixel: Optional[float] = None  # estimated from median hold size
     scale_method: Optional[str] = None        # "median-hold-size" | "fallback-wall-height"
     colors: dict[str, int] = Field(default_factory=dict)  # hold count per color, for the route-color picker
+
+
+class RouteDifficulty(BaseModel):
+    """How hard the route is for THIS climber, judged from hold types and reach."""
+    grade: str                      # "V0".."V10"
+    score: float                    # 0-10 before rounding to a grade
+    label: str                      # easy / moderate / hard / very hard
+    hardest_move: Optional[Move] = None
+    hold_counts: dict[str, int] = Field(default_factory=dict)  # hold type -> holds on the route
+    assumed_holds: list[int] = Field(default_factory=list)     # route holds whose type was assumed, not given
+    default_hold_type: str = DEFAULT_HOLD_TYPE
+    reasoning: str = ""
+    source: str = "rule-based"
+
+
+class DifficultyRequest(BaseModel):
+    plan: "PlanResponse"
+    holds: list[Hold]
+    climber: Climber
+    assumed_holds: list[int] = Field(default_factory=list)
+    default_hold_type: HoldType = DEFAULT_HOLD_TYPE
 
 
 class CriticFeedback(BaseModel):
@@ -160,6 +192,28 @@ class SolveRequest(BaseModel):
     inches_per_pixel: float = Field(..., gt=0)
     climber: Climber
     max_rounds: int = Field(4, ge=1, le=8)
+    # Hold types the user knows (hold id -> type). Every other unclassified hold uses default_hold_type.
+    hold_types: dict[int, HoldType] = Field(default_factory=dict)
+    default_hold_type: HoldType = DEFAULT_HOLD_TYPE
+
+    _clean = field_validator("hold_types", mode="before")(_clean_hold_types)
+
+    @field_validator("default_hold_type", mode="before")
+    @classmethod
+    def _lower_default(cls, v):
+        return v.strip().lower() if isinstance(v, str) else v
+
+
+class GripPick(BaseModel):
+    """A grip the climber set by tapping a hold on the photo (image pixels)."""
+    x: float
+    y: float
+    type: HoldType
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def _lower(cls, v):
+        return v.strip().lower() if isinstance(v, str) else v
 
 
 class SolvePhotoRequest(BaseModel):
@@ -169,9 +223,22 @@ class SolvePhotoRequest(BaseModel):
     route_color: Optional[str] = None           # keep only holds of this color; None = all holds
     start_id: Optional[int] = None              # ids refer to the filtered hold list
     finish_id: Optional[int] = None
+    # Or pick them on the photo: (x, y) in image pixels, snapped to the nearest hold on the route.
+    start_point: Optional[tuple[float, float]] = None
+    finish_point: Optional[tuple[float, float]] = None
     inches_per_pixel: Optional[float] = Field(None, gt=0)  # overrides Vision's estimate
     min_conf: float = Field(0.5, ge=0, le=1)
     max_rounds: int = Field(4, ge=1, le=8)
+    hold_types: dict[int, HoldType] = Field(default_factory=dict)  # ids refer to the filtered hold list
+    grips: list[GripPick] = Field(default_factory=list)  # set on the photo; snapped to the hold under each tap
+    default_hold_type: HoldType = DEFAULT_HOLD_TYPE
+
+    _clean = field_validator("hold_types", mode="before")(_clean_hold_types)
+
+    @field_validator("default_hold_type", mode="before")
+    @classmethod
+    def _lower_default(cls, v):
+        return v.strip().lower() if isinstance(v, str) else v
 
 
 class TraceEntry(BaseModel):
@@ -190,7 +257,11 @@ class SolveResponse(BaseModel):
     finish_id: Optional[int] = None
     plan: Optional[PlanResponse] = None
     critic_approved: bool = False
+    difficulty: Optional[RouteDifficulty] = None
     beta: Optional[CoachResponse] = None
     trace: list[TraceEntry] = Field(default_factory=list)
     rounds: int = 0
     orchestrator_source: str = "fixed"  # "claude" or "fixed" -- which pipeline ran
+
+
+DifficultyRequest.model_rebuild()

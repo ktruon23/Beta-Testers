@@ -1,5 +1,5 @@
 from planner import plan
-from shared.schemas import PlanRequest, Hold, Climber
+from backend.shared.schemas import PlanRequest, Hold, Climber
 
 holds = [
     Hold(id=0, x=100, y=500, type="jug"),

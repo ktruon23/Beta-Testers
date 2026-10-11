@@ -3,8 +3,8 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import critic
-from shared.schemas import Climber, CritiqueRequest, PlanResponse
-from tests.conftest import ladder, move
+from backend.shared.schemas import Climber, CritiqueRequest, PlanResponse
+from backend.tests.conftest import ladder, move
 
 client = TestClient(critic.app)
 CLIMBER = Climber(height_in=66, wingspan_in=68)

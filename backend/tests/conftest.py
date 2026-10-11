@@ -22,7 +22,7 @@ for p in (ROOT, ROOT / "vision-agent", ROOT / "planner-agent", ROOT / "coach-age
 
 import pytest  # noqa: E402
 
-from shared.schemas import Climber, Hold, Move  # noqa: E402
+from backend.shared.schemas import Climber, Hold, Move  # noqa: E402
 
 
 def ladder(n=5, spacing_px=100, x=100, types=None):

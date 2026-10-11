@@ -14,8 +14,8 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from shared.llm import call_structured, llm_available
-from shared.schemas import (
+from backend.shared.llm import call_structured, llm_available
+from backend.shared.schemas import (
     Hold,
     Move,
     PlanAlternative,
@@ -245,7 +245,9 @@ def _search(
         )
         return {
             "ok": False,
-            "error": f"No route reaches finish hold #{req.finish_id}. Closest reachable hold is #{closest}, {gap_distance:.1f} in from the finish (max move {move_limit:.1f} in).",
+            "error": (f"No route gets you all the way to the finish. The closest I can get is {gap_distance:.0f} in "
+                      f"away from it, and your longest move is about {move_limit:.0f} in, so it's just out of reach. "
+                      f"Try picking a different finish or a lower hold."),
             "path": [], "moves": [], "total_cost": 0.0, "reach_in": reach_in,
             "closest_reachable_id": closest, "gap_distance_in": round(gap_distance, 2),
         }

@@ -8,7 +8,7 @@ import coach
 import critic
 import orchestrator
 import planner
-from shared.schemas import Hold
+from backend.shared.schemas import Hold
 
 AGENTS = {
     orchestrator.PLANNER_URL: TestClient(planner.app),
@@ -108,7 +108,7 @@ def test_critic_constraints_reroute(wire):
     out = api.post("/solve", json={"holds": holds, "inches_per_pixel": 0.2, "climber": CLIMBER}).json()
     assert out["ok"]
     assert out["rounds"] >= 2
-    assert any("REJECTED" in t["summary"] for t in out["trace"])
+    assert any(t["payload"].get("approved") is False for t in out["trace"])
 
 
 def test_solve_photo_happy_path(wire):

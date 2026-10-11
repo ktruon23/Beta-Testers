@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 import coach
 import database
-from shared.schemas import Climber, CoachRequest, PlanResponse
-from tests.conftest import ladder, move
+from backend.shared.schemas import Climber, CoachRequest, PlanResponse
+from backend.tests.conftest import ladder, move
 
 client = TestClient(coach.app)
 CLIMBER = Climber(height_in=66, wingspan_in=68)

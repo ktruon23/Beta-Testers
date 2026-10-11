@@ -2,8 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import planner
-from shared.schemas import Climber, Hold, PlanRequest
-from tests.conftest import ladder
+from backend.shared.schemas import Climber, Hold, PlanRequest
+from backend.tests.conftest import ladder
 
 client = TestClient(planner.app)
 
@@ -37,7 +37,7 @@ def test_gap_bigger_than_reach_reports_closest_hold():
     assert not r["ok"]
     assert r["closest_reachable_id"] == 1
     assert r["gap_distance_in"] == pytest.approx(160.0)
-    assert "#2" in r["error"]
+    assert "finish" in r["error"] and "#" not in r["error"]
 
 
 def test_avoid_hold_forces_detour():

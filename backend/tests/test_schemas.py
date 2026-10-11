@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from shared.schemas import Climber
+from backend.shared.schemas import Climber
 
 
 def test_reach_is_wingspan_times_factor():

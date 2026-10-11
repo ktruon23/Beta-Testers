@@ -24,8 +24,10 @@ st.set_page_config(page_title="Beta Agents", layout="wide")
 AGENTS = {  # stage -> (display name, avatar)
     "detect": ("Vision", "👁️"),
     "filter": ("Orchestrator", "🧭"),
+    "holds": ("Orchestrator", "🧭"),
     "plan": ("Planner", "🗺️"),
     "critique": ("Critic", "🧐"),
+    "grade": ("Critic", "🧐"),
     "coach": ("Coach", "🧗"),
     "error": ("System", "⚠️"),
 }
@@ -34,6 +36,7 @@ STAGE_LABEL = {
     "filter": "Picking the route color",
     "plan": "Planning a route",
     "critique": "Critiquing the route",
+    "grade": "Grading the route",
     "coach": "Writing the beta",
 }
 
@@ -48,6 +51,7 @@ def draw(image_bytes: bytes, holds: list[dict], path: list[int] | None = None,
     for h in holds:
         color = (255, 60, 60) if avoid and h["id"] in avoid else (255, 255, 255)
         d.ellipse([h["x"] - r, h["y"] - r, h["x"] + r, h["y"] + r], outline=color, width=2)
+        d.text((h["x"] + r + 2, h["y"] - r), str(h["id"]), fill=color)  # id, for setting hold types
     if path:
         pts = [(by_id[i]["x"], by_id[i]["y"]) for i in path if i in by_id]
         d.line(pts, fill=(0, 230, 120), width=max(2, r // 2))
@@ -67,6 +71,18 @@ with st.sidebar:
     reach_factor = st.slider("Reach factor", 0.6, 1.1, 0.85, 0.01,
                              help="Longest single move = wingspan x reach factor")
     st.caption(f"Longest allowed move: {wingspan * reach_factor:.0f} in")
+
+    st.header("Holds")
+    default_hold = st.selectbox("Default hold type", pipeline.HOLD_TYPES,
+                                index=pipeline.HOLD_TYPES.index(pipeline.DEFAULT_HOLD_TYPE),
+                                help="Used for every hold the camera can't identify")
+    hold_types_text = st.text_input("Known hold types", placeholder="3=crimp, 5=sloper",
+                                    help="Hold id = type, using the ids drawn on the photo")
+    try:
+        hold_types = pipeline.parse_hold_types(hold_types_text)
+    except ValueError as e:
+        st.error(str(e))
+        hold_types = {}
 
     st.header("Agents")
     max_rounds = st.slider("Max Planner/Critic rounds", 1, 8, 4)
@@ -139,7 +155,8 @@ if go:
     avoid: set[int] = set()
     status_widget = None
     for ev in pipeline.run(image_bytes, climber, route_color=route_color, min_conf=min_conf,
-                           max_rounds=max_rounds, detection=det):
+                           max_rounds=max_rounds, detection=det,
+                           hold_types=hold_types, default_hold_type=default_hold):
         name, avatar = AGENTS.get(ev.stage, ("System", "ℹ️"))
 
         if ev.stage in STAGE_LABEL and ev.status == "running":
@@ -149,7 +166,7 @@ if go:
                 status_widget = st.status(f"{avatar} {ev.title}", expanded=True)
             continue
 
-        if ev.stage == "filter":
+        if ev.stage in ("filter", "holds"):
             holds_for_route = ev.data["holds"]
         if ev.stage == "critique" and not ev.data.get("approved", True):
             avoid |= set(ev.data.get("avoid_holds", []))
@@ -187,6 +204,11 @@ if res and res.get("plan"):
                          caption=("Final route (approved by the Critic)" if res["approved"]
                                   else "Final route (not approved)"),
                          use_container_width=True)
+        diff = res.get("difficulty")
+        if diff:
+            st.metric("Difficulty for you", diff["grade"], diff["label"], delta_color="off")
+            for line in pipeline.explain_difficulty(diff)[1:]:
+                st.caption(line)
         st.markdown("#### Moves (calculated, not guessed)")
         st.dataframe([{
             "move": f"#{m['from_id']} → #{m['to_id']}",

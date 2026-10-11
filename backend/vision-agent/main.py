@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from object_detection import HOLD_CLASS_ID, predict  # noqa: E402
 from scale import estimate_scale  # noqa: E402
-from shared.schemas import DetectRequest, DetectResponse, Hold  # noqa: E402
+from backend.shared.schemas import DetectRequest, DetectResponse, Hold  # noqa: E402
 
 warnings.filterwarnings("ignore", message=".*legacy channel.*")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
