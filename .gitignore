@@ -12,3 +12,12 @@ output/
 __pycache__/
 *.pyc
 *.db
+.write_probe
+
+# PYTHON
+.venv/
+venv/
+
+# FRONTEND
+node_modules/
+frontend/dist/

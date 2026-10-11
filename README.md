@@ -39,18 +39,13 @@ pytest.ini
 
 Requires Python 3.10+ and Node 20+.
 
-1. Create `backend/.env`:
+1. Create `backend/.env` from the template and fill in your keys:
 
    ```
-   ANTHROPIC_API_KEY=        # optional, enables Claude in every agent
-   ROBOFLOW_API_KEY=         # hold detection
-   WORKSPACE_NAME=
-   WORKFLOW_ID=
-   # Optional: use an OpenAI-compatible server (e.g. NVIDIA Brev / vLLM) instead of Claude
-   # LLM_PROVIDER=brev
-   # LLM_BASE_URL=http://<host>:8000/v1
-   # LLM_MODEL=
+   cp backend/.env.example backend/.env
    ```
+
+   `ANTHROPIC_API_KEY` is optional; it enables Claude in every agent. The Roboflow keys (`ROBOFLOW_API_KEY`, `WORKSPACE_NAME`, `WORKFLOW_ID`) are needed for hold detection. To use an OpenAI-compatible server (for example NVIDIA Brev or vLLM) instead of Claude, uncomment the `LLM_*` lines in the template.
 
 2. Install and start the agents from the repo root:
 
@@ -78,7 +73,7 @@ pip install -r backend/requirements-dev.txt
 python -m pytest
 ```
 
-Run this from the repo root. The suite wires the agents together in-process and needs no API keys.
+Run this from the repo root. The suite wires the agents together in-process and needs no API keys. GitHub Actions runs it, plus the frontend build, on every push and pull request (`.github/workflows/ci.yml`).
 
 ## Without an API key
 
@@ -97,3 +92,7 @@ The page labels which path was used, for example "fixed pipeline (no API key)".
 - The planner only models hand moves. It ignores feet, body position, matching and dynos, and it minimizes total move cost rather than the single hardest move.
 - The scale is approximate. It is estimated from the median hold size unless you set it by tapping two points and entering the real distance. The reach factor (0.85 x wingspan) is also a guess.
 - Hold types come from the camera or from your taps. Unknown holds are assumed to be a default type, and the grade says so.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
