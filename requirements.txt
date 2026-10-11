@@ -1,0 +1,8 @@
+opencv-python
+numpy
+python-dotenv
+inference-sdk
+fastapi
+uvicorn[standard]
+anthropic
+
