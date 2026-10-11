@@ -2,17 +2,19 @@
 Small LLM wrapper used by the Planner and Critic agents.
 
 Two backends, picked from .env:
-  1. NVIDIA Brev (or any OpenAI-compatible server: vLLM, NIM, Ollama...)
+  1. Claude (Anthropic) -- the default whenever ANTHROPIC_API_KEY is set
+       ANTHROPIC_API_KEY=...
+       CLAUDE_MODEL=claude-sonnet-5-5
+  2. NVIDIA Brev (or any OpenAI-compatible server: vLLM, NIM, Ollama...)
        LLM_BASE_URL=http://<brev-ip-or-tunnel>:8000/v1
        LLM_MODEL=Qwen/Qwen2.5-14B-Instruct      # whatever the server is serving
        LLM_API_KEY=...                           # only if you started vLLM with --api-key
-  2. Claude, used when LLM_BASE_URL is not set
-       ANTHROPIC_API_KEY=...
-       CLAUDE_MODEL=claude-sonnet-5-5
-With neither set, llm_available() is False and the agents use their rule-based fallback.
+     Used when there is no Anthropic key, or when LLM_PROVIDER=brev.
+LLM_PROVIDER=anthropic|brev forces one. With neither configured, llm_available()
+is False and the agents use their rule-based fallback.
 
-Either way we force the model to answer by calling a "tool" whose input schema is
-the exact JSON shape we want back, so there is no free text to parse.
+Either way the model answers by calling a "tool" whose input schema is the exact
+JSON shape we want back, so there is no free text to parse.
 """
 
 import json
@@ -25,13 +27,19 @@ LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "120"))
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "").strip().lower()
 
 
 def backend() -> str:
+    has_claude = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    if LLM_PROVIDER in ("anthropic", "claude"):
+        return "claude" if has_claude else "none"
+    if LLM_PROVIDER == "brev":
+        return "brev" if LLM_BASE_URL else "none"
+    if has_claude:
+        return "claude"
     if LLM_BASE_URL:
         return "brev"
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "claude"
     return "none"
 
 

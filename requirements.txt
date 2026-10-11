@@ -3,6 +3,7 @@ uvicorn[standard]
 httpx
 pydantic
 anthropic
+brotlicffi>=1.2  # older versions crash the anthropic SDK (output_buffer_limit error)
 opencv-python
 numpy
 python-dotenv
