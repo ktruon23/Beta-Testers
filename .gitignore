@@ -2,6 +2,7 @@
 
 .write_test
 output/
+.pytest_cache/
 
 
 # EXTRAS

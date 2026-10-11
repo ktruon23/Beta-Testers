@@ -670,7 +670,12 @@ def solve_photo(req: SolvePhotoRequest):
         log("Orchestrator", "Orchestrator", f"You picked {where(holds, finish_id)} as the finish.",
             {"draw": drawing(holds, marks=[(finish_id, "finish")])})
 
-    ipp = req.inches_per_pixel or det.inches_per_pixel
+    if req.scale_ref:
+        ipp = req.scale_ref.inches_per_pixel
+        log("Orchestrator", "Orchestrator", "I'll size every move from your measurement of the wall, "
+            "not from the hold sizes.", {"inches_per_pixel": ipp, "scale_method": "user-measurement"})
+    else:
+        ipp = req.inches_per_pixel or det.inches_per_pixel
     if not ipp:
         raise HTTPException(400, "No scale available: pass inches_per_pixel.")
 

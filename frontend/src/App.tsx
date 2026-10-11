@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SVGProps } from "react";
 import {
   GRIPS,
+  MIN_SCALE_PX,
   detect,
   formatInches,
   healthAll,
@@ -12,6 +13,7 @@ import {
   type Hold,
   type Level,
   type Point,
+  type ScaleRef,
   type Sketch,
   type SolveResponse,
   type TraceEntry,
@@ -21,6 +23,11 @@ type Photo = { dataUrl: string; b64: string; width: number; height: number };
 
 type Picks = { start: Point | null; finish: Point | null };
 type Grips = Record<string, Grip>; // keyed by holdKey()
+/** Two taps on the photo (image pixels) and the real distance between them, as typed. */
+type Scale = { a: Point | null; b: Point | null; length: string };
+const DEFAULT_WALL_HEIGHT = "14 ft";
+const WINGSPAN_MIN = 12;
+const WINGSPAN_MAX = 120;
 
 const holdKey = (h: { x: number; y: number }) => `${h.x},${h.y}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -126,26 +133,57 @@ function sketchOf(entry: TraceEntry | undefined): Sketch | null {
   return draw && (draw.path.length || draw.highlights.length || draw.marks.length || draw.crossed.length) ? draw : null;
 }
 
+/** Sets --len to the element's real length so the CSS can draw it in from start to end.
+ * (pathLength=1 tricks drew lines short in some browsers, so we measure instead.) */
+function useStrokeLength<T extends SVGGeometryElement>() {
+  const ref = useRef<T>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) el.style.setProperty("--len", `${Math.ceil(el.getTotalLength()) + 2}`);
+  });
+  return ref;
+}
+
+function SketchPath(props: Omit<SVGProps<SVGPolylineElement>, "ref">) {
+  return <polyline ref={useStrokeLength<SVGPolylineElement>()} {...props} />;
+}
+
+function SketchLine(props: Omit<SVGProps<SVGLineElement>, "ref">) {
+  return <line ref={useStrokeLength<SVGLineElement>()} {...props} />;
+}
+
 /** Draws what an agent is talking about: the route it proposes, the move it calls out, the holds it skips. */
 function SketchLayer({ sketch, photo }: { sketch: Sketch; photo: Photo }) {
   const at = ([x, y]: [number, number]) => ({ left: pct(x, photo.width), top: pct(y, photo.height) });
   const pathTime = 0.25 * Math.max(1, sketch.path.length - 1); // seconds to draw the route, hold by hold
+  // Stroke widths are in photo pixels, so convert the on-screen widths (4 px route, 7 px highlight).
+  const ref = useRef<HTMLDivElement>(null);
+  const [photoPxPerScreenPx, setRatio] = useState(1);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => el.clientWidth && setRatio(photo.width / el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [photo.width]);
   return (
-    <div className="sketch-layer">
+    <div className="sketch-layer" ref={ref}>
       <svg viewBox={`0 0 ${photo.width} ${photo.height}`} preserveAspectRatio="none">
         {sketch.path.length > 1 && (
-          <polyline
+          <SketchPath
             className="sketch-path"
-            pathLength={1}
+            strokeWidth={4 * photoPxPerScreenPx}
             style={{ animationDuration: `${pathTime}s` }}
             points={sketch.path.map(([x, y]) => `${x},${y}`).join(" ")}
           />
         )}
         {sketch.highlights.map((h, i) => (
-          <line
+          <SketchLine
             key={i}
             className={`sketch-highlight ${h.label === "skip" || h.label === "too far" ? "bad" : ""}`}
-            pathLength={1}
+            strokeWidth={7 * photoPxPerScreenPx}
             style={{ animationDelay: `${sketch.path.length > 1 ? pathTime : 0}s` }}
             x1={h.from[0]}
             y1={h.from[1]}
@@ -186,16 +224,49 @@ function SketchLayer({ sketch, photo }: { sketch: Sketch; photo: Photo }) {
   );
 }
 
+/** The scale to send, or why it can't be used. No taps yet = no scale (Vision estimates it). */
+function checkScale(scale: Scale): { ref: ScaleRef | null; error: string | null } {
+  const { a, b } = scale;
+  if (!a || !b) return { ref: null, error: null };
+  const inches = parseLength(scale.length);
+  if (!inches || inches <= 0 || inches > 1200)
+    return { ref: null, error: "Enter the wall height like 14 ft, 14 ft 6 in or 168 in." };
+  if (Math.hypot(b[0] - a[0], b[1] - a[1]) < MIN_SCALE_PX)
+    return { ref: null, error: "Those two taps are too close together. Redo the scale or clear it." };
+  return { ref: { a, b, inches }, error: null };
+}
+
+/** The two scale taps and the dashed line between them. */
+function ScaleLayer({ scale, photo }: { scale: Scale; photo: Photo }) {
+  const at = ([x, y]: Point) => ({ left: pct(x, photo.width), top: pct(y, photo.height) });
+  const { a, b } = scale;
+  return (
+    <div className="sketch-layer scale-layer">
+      {a && b && (
+        <svg viewBox={`0 0 ${photo.width} ${photo.height}`} preserveAspectRatio="none">
+          <line className="scale-line" x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />
+        </svg>
+      )}
+      {[a, b].map((p, i) => (p ? <span key={i} className="scale-dot" style={at(p)} /> : null))}
+      {a && b && scale.length.trim() && (
+        <span className="sketch-label" style={at([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])}>
+          {scale.length.trim()}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- page pieces ---------------- */
 
 function Header() {
   return (
     <header className="site-header">
-      <a className="wordmark" href="#top" aria-label="Beta Agents home">
+      <a className="wordmark" href="#top" aria-label="Beta Testers home">
         <span className="wordmark-mark" aria-hidden="true">
           β
         </span>
-        Beta Agents
+        Beta Testers
       </a>
       <nav aria-label="Page sections">
         <a href="#wall">Your wall</a>
@@ -233,8 +304,16 @@ function WallUpload({
   onPick,
   grips,
   setGrip,
+  scale,
+  scaling,
+  onScaleTap,
+  onScaleButton,
   onPhoto,
 }: {
+  scale: Scale;
+  scaling: boolean;
+  onScaleTap: (p: Point) => void;
+  onScaleButton: () => void;
   grips: Grips;
   setGrip: (hold: Hold, grip: Grip | null) => void;
   photo: Photo | null;
@@ -250,7 +329,7 @@ function WallUpload({
   const [dragging, setDragging] = useState(false);
   const choose = () => fileRef.current?.click();
   const [editing, setEditing] = useState<Hold | null>(null);
-  useEffect(() => setEditing(null), [photo, detection, picking, color]);
+  useEffect(() => setEditing(null), [photo, detection, picking, scaling, color]);
   useEffect(() => {
     if (!editing) return;
     const close = (e: KeyboardEvent) => e.key === "Escape" && setEditing(null);
@@ -260,7 +339,7 @@ function WallUpload({
 
   return (
     <div
-      className={`wall-upload ${dragging ? "dragging" : ""} ${photo ? "has-photo" : ""} ${picking ? "picking" : ""}`}
+      className={`wall-upload ${dragging ? "dragging" : ""} ${photo ? "has-photo" : ""} ${picking || scaling ? "picking" : ""}`}
       // Before there's a photo the whole area opens the file picker; after, only "Change photo" does.
       role={photo ? undefined : "button"}
       tabIndex={photo ? undefined : 0}
@@ -304,6 +383,8 @@ function WallUpload({
                     style={{ left: pct(h.x, photo.width), top: pct(h.y, photo.height) }}
                     onClick={() => onPick(h)}
                   />
+                ) : scaling ? (
+                  <span key={h.id} className="detected-hold faint" style={{ left: pct(h.x, photo.width), top: pct(h.y, photo.height) }} />
                 ) : (
                   <button
                     key={h.id}
@@ -360,6 +441,21 @@ function WallUpload({
                 </span>
               ) : null;
             })}
+            {(scale.a || scaling) && <ScaleLayer scale={scale} photo={photo} />}
+            {scaling && (
+              // Scale taps land anywhere on the photo, not on holds, so they never pick a hold or grip.
+              <div
+                className="scale-catcher"
+                aria-hidden="true"
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  onScaleTap([
+                    Math.round(((e.clientX - r.left) / r.width) * photo.width),
+                    Math.round(((e.clientY - r.top) / r.height) * photo.height),
+                  ]);
+                }}
+              />
+            )}
             {detecting && (
               <div className="detect-loading" aria-hidden="true">
                 <span className="scan-line" />
@@ -374,15 +470,24 @@ function WallUpload({
               </>
             ) : picking ? (
               `Tap a hold to use as your ${picking}`
+            ) : scaling ? (
+              scale.a ? "Now tap the top of the wall" : "Tap the bottom of the wall"
+            ) : scale.a && scale.b ? (
+              "Scale set · change the height under Wall scale"
             ) : detection ? (
               `${color ? `${detection.colors[color] ?? 0} ${color}` : `Vision found ${detection.holds.length}`} holds · tap one to set its grip`
             ) : (
               "Photo ready"
             )}
           </span>
-          <button type="button" className="replace-photo" onClick={choose}>
-            Change photo
-          </button>
+          <div className="photo-actions">
+            <button type="button" className="replace-photo" onClick={onScaleButton}>
+              {scaling ? "Cancel scale" : scale.a && scale.b ? "Redo scale" : "Set scale"}
+            </button>
+            <button type="button" className="replace-photo" onClick={choose}>
+              Change photo
+            </button>
+          </div>
         </>
       ) : (
         <div className="upload-prompt">
@@ -407,7 +512,11 @@ function ProfileForm({
   error,
   onFind,
   pickBar,
+  scaleBar,
+  scaleError,
 }: {
+  scaleBar: ReactNode;
+  scaleError: string | null;
   colors: Record<string, number>;
   color: string;
   setColor: (color: string) => void;
@@ -429,8 +538,13 @@ function ProfileForm({
         event.preventDefault();
         const h = parseLength(height);
         const w = parseLength(wingspan);
-        if (!h || h < 36 || h > 96) return setFormError("Enter your height like 5 ft 8 in, 68 in or 173 cm.");
-        if (!w || w < 36 || w > 110) return setFormError("Enter your wingspan like 70 in or 178 cm.");
+        if (!h) return setFormError("Enter your height like 5 ft 8 in, 68 in or 173 cm.");
+        if (h < 36 || h > 96) return setFormError(`Height must be between 36 and 96 in (you entered ${formatInches(h)}).`);
+        if (!w) return setFormError("Enter your wingspan like 70 in or 178 cm.");
+        // Same limits as the backend's Climber.wingspan_in; a short reach just finds fewer moves.
+        if (w < WINGSPAN_MIN || w > WINGSPAN_MAX)
+          return setFormError(`Wingspan must be between ${WINGSPAN_MIN} and ${WINGSPAN_MAX} in (you entered ${formatInches(w)}).`);
+        if (scaleError) return setFormError(scaleError);
         setFormError(null);
         onFind({ height: h, wingspan: w, level, color });
       }}
@@ -467,6 +581,10 @@ function ProfileForm({
       <div className="form-field">
         <span>Start and finish</span>
         {pickBar}
+      </div>
+      <div className="form-field">
+        <span>Wall scale (optional)</span>
+        {scaleBar}
       </div>
       {(formError || error) && (
         <p className="form-error" role="alert">
@@ -715,6 +833,76 @@ function PickBar({
   );
 }
 
+function ScaleBar({
+  scale,
+  setScale,
+  scaling,
+  setScaling,
+  error,
+  disabled = false,
+}: {
+  scale: Scale;
+  setScale: (scale: Scale) => void;
+  scaling: boolean;
+  setScaling: (on: boolean) => void;
+  error: string | null;
+  disabled?: boolean;
+}) {
+  const restart = () => {
+    setScale({ ...scale, a: null, b: null });
+    setScaling(true);
+  };
+  if (scaling) {
+    return (
+      <div className="pick-bar picking in-form" role="status">
+        <span>
+          {scale.a ? "Now tap the top of the wall." : "Tap the bottom and top of the wall, then enter its height."}
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setScale({ ...scale, a: null, b: null });
+            setScaling(false);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  if (scale.a && scale.b) {
+    return (
+      <div className="pick-bar in-form scale-bar">
+        <label>
+          <span>Distance between your taps</span>
+          <input
+            value={scale.length}
+            onChange={(e) => setScale({ ...scale, length: e.target.value })}
+            aria-label="Distance between the two scale points"
+            aria-invalid={!!error}
+            placeholder={DEFAULT_WALL_HEIGHT}
+          />
+        </label>
+        <button type="button" onClick={restart}>
+          Redo
+        </button>
+        <button type="button" onClick={() => setScale({ ...scale, a: null, b: null })}>
+          Clear
+        </button>
+        {error && <small className="scale-error">{error}</small>}
+      </div>
+    );
+  }
+  return (
+    <div className="pick-bar in-form">
+      <span>We&apos;ll guess the size from the holds, or you can measure it.</span>
+      <button type="button" disabled={disabled} onClick={restart}>
+        Set scale
+      </button>
+    </div>
+  );
+}
+
 function MoveList({
   result,
   activeHold,
@@ -770,8 +958,8 @@ function Alternatives({
   if (!plan || alts.length === 0) return null;
 
   return (
-    <div className="alternatives">
-      <span>Also try:</span>
+    <div className="alternatives" role="group" aria-label="Other routes">
+      <span>Other routes</span>
       <button className={shownPath === null ? "active" : ""} onClick={() => onShow(null)}>
         the {plan.strategy} line (chosen)
       </button>
@@ -811,6 +999,9 @@ export default function App() {
   const [setupPicking, setSetupPicking] = useState<"start" | "finish" | null>(null); // on the photo, before
   const [hovered, setHovered] = useState<TraceEntry | null>(null);
   const [grips, setGrips] = useState<Grips>({});
+  const [scale, setScale] = useState<Scale>({ a: null, b: null, length: DEFAULT_WALL_HEIGHT });
+  const [scaling, setScalingState] = useState(false); // taps on the photo set the scale, not holds
+  const scaleCheck = checkScale(scale);
   const skipPacing = useRef(false);
   const lastArgs = useRef<ProfileArgs | null>(null);
   const photoId = useRef(0);
@@ -828,6 +1019,8 @@ export default function App() {
     setPicks({ start: null, finish: null });
     setPicking(null);
     setSetupPicking(null);
+    setScale((s) => ({ ...s, a: null, b: null }));
+    setScalingState(false);
     setGrips({});
     try {
       const p = await loadPhoto(file);
@@ -851,6 +1044,7 @@ export default function App() {
     setPicks(chosen);
     setPicking(null);
     setSetupPicking(null);
+    setScalingState(false);
     setHovered(null);
     setSolving(true);
     setError(null);
@@ -885,6 +1079,7 @@ export default function App() {
           start_point: chosen.start,
           finish_point: chosen.finish,
           grips: routeGrips,
+          scale_ref: scaleCheck.ref,
         },
         (entry) => pending.push(entry),
       ).finally(() => {
@@ -932,6 +1127,20 @@ export default function App() {
     setPicks({ start: null, finish: null });
     setSetupPicking(null);
   };
+  // Picking a hold and setting the scale both take taps on the photo, so only one is on at a time.
+  const setScaling = (on: boolean) => {
+    setScalingState(on);
+    if (on) setSetupPicking(null);
+  };
+  const choosePick = (mode: "start" | "finish" | null) => {
+    setSetupPicking(mode);
+    if (mode) setScalingState(false);
+  };
+  const scaleTap = (p: Point) => {
+    if (!scale.a || scale.b) return setScale({ ...scale, a: p, b: null });
+    setScale({ ...scale, b: p });
+    setScalingState(false);
+  };
   const pickOnPhoto = (h: Hold) => {
     if (!setupPicking) return;
     const other = setupPicking === "start" ? "finish" : "start";
@@ -973,6 +1182,13 @@ export default function App() {
                   return next;
                 })
               }
+              scale={scale}
+              scaling={scaling}
+              onScaleTap={scaleTap}
+              onScaleButton={() => {
+                setScale((s) => ({ ...s, a: null, b: null }));
+                setScaling(!scaling);
+              }}
               onPhoto={handlePhoto}
             />
             <ProfileForm
@@ -985,10 +1201,21 @@ export default function App() {
                   disabled={!detection}
                   picks={picks}
                   picking={setupPicking}
-                  setPicking={setSetupPicking}
+                  setPicking={choosePick}
                   onAuto={() => setPicks({ start: null, finish: null })}
                 />
               }
+              scaleBar={
+                <ScaleBar
+                  disabled={!photo}
+                  scale={scale}
+                  setScale={setScale}
+                  scaling={scaling}
+                  setScaling={setScaling}
+                  error={scaleCheck.error}
+                />
+              }
+              scaleError={scaleCheck.error}
               canSubmit={!!photo}
               solving={solving}
               error={error}
@@ -1016,6 +1243,14 @@ export default function App() {
           {result && photo && attempt ? (
             <div className="route-layout">
               <div className="wall-side" id="route-image">
+                <Alternatives
+                  result={result}
+                  shownPath={altPath}
+                  onShow={(p) => {
+                    setAltPath(p);
+                    setRound(attempts.length - 1);
+                  }}
+                />
                 <RouteWall
                   photo={photo}
                   holds={result.holds}
@@ -1103,19 +1338,11 @@ export default function App() {
                 ))}
               </ul>
             )}
-            <Alternatives
-              result={result}
-              shownPath={altPath}
-              onShow={(p) => {
-                setAltPath(p);
-                setRound(attempts.length - 1);
-              }}
-            />
           </section>
         )}
       </main>
       <footer>
-        <span>Beta Agents</span>
+        <span>Beta Testers</span>
         <p>Check the landing, climb within your limits, and have a good session.</p>
       </footer>
     </div>

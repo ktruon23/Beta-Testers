@@ -1,5 +1,5 @@
 """
-Step-by-step driver for the Beta Agents pipeline that reports what each agent is doing.
+Step-by-step driver for the Beta Testers pipeline that reports what each agent is doing.
 
 It calls the agent services directly (Vision -> Planner <-> Critic -> Coach) instead of
 the Orchestrator's /solve, so every stage can be shown live as it happens. The round
@@ -308,7 +308,7 @@ NAMES = {"detect": "VISION", "filter": "ORCH", "holds": "ORCH", "plan": "PLANNER
          "coach": "COACH", "done": "DONE", "error": "ERROR"}
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Run Beta Agents and watch each agent think.")
+    ap = argparse.ArgumentParser(description="Run Beta Testers and watch each agent think.")
     ap.add_argument("image")
     ap.add_argument("--color")
     ap.add_argument("--height", type=float, default=68)

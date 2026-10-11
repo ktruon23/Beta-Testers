@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 import critic
 from backend.shared.schemas import Climber, CritiqueRequest, PlanResponse
-from backend.tests.conftest import ladder, move
+from tests.conftest import ladder, move
 
 client = TestClient(critic.app)
 CLIMBER = Climber(height_in=66, wingspan_in=68)

@@ -155,6 +155,15 @@ export function solvePhoto(req: {
 /** Like solvePhoto, but calls onEntry with each agent message as it happens. */
 export type Point = [number, number];
 
+/** Two points tapped on the photo and the real distance between them. Overrides Vision's scale guess. */
+export interface ScaleRef {
+  a: Point;
+  b: Point;
+  inches: number;
+}
+
+export const MIN_SCALE_PX = 20; // matches backend/shared/schemas.py
+
 export async function solvePhotoStream(
   req: {
     image_b64: string;
@@ -163,6 +172,7 @@ export async function solvePhotoStream(
     start_point?: Point | null; // tapped on the photo; the backend snaps it to the nearest hold
     finish_point?: Point | null;
     grips?: { x: number; y: number; type: Grip }[]; // grips the climber set on holds
+    scale_ref?: ScaleRef | null; // the climber's measurement; null = estimate from hold sizes
   },
   onEntry: (entry: TraceEntry) => void,
 ): Promise<SolveResponse> {

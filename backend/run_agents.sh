@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start all Beta Agents services in the background; Ctrl+C stops them all.
+# Start all Beta Testers services in the background; Ctrl+C stops them all.
 # Runs from the repo root (parent of backend/) so `backend.shared` is importable.
 cd "$(dirname "$0")/.."
 trap 'kill $(jobs -p) 2>/dev/null' EXIT

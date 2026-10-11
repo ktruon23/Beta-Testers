@@ -17,7 +17,8 @@ for var in ("ANTHROPIC_API_KEY", "LLM_BASE_URL", "LLM_PROVIDER", "LLM_MODEL", "L
 os.environ["COACH_DB"] = os.path.join(tempfile.mkdtemp(), "coach-test.db")
 
 ROOT = Path(__file__).resolve().parent.parent
-for p in (ROOT, ROOT / "vision-agent", ROOT / "planner-agent", ROOT / "coach-agent"):
+BACKEND = ROOT / "backend"
+for p in (ROOT, BACKEND / "vision-agent", BACKEND / "planner-agent", BACKEND / "coach-agent"):
     sys.path.insert(0, str(p))
 
 import pytest  # noqa: E402

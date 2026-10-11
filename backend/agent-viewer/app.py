@@ -1,5 +1,5 @@
 """
-Beta Agents live viewer.
+Beta Testers live viewer.
 
 Shows which stage the system is in (detecting, planning, critiquing, coaching) and what
 each agent is thinking, live, as the Planner and Critic negotiate a route.
@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw
 
 import pipeline
 
-st.set_page_config(page_title="Beta Agents", layout="wide")
+st.set_page_config(page_title="Beta Testers", layout="wide")
 
 AGENTS = {  # stage -> (display name, avatar)
     "detect": ("Vision", "👁️"),
@@ -101,7 +101,7 @@ climber = {"height_in": height, "wingspan_in": wingspan, "reach_factor": reach_f
 
 # ---------------------------------------------------------------- step 1: photo + detection
 
-st.title("Beta Agents")
+st.title("Beta Testers")
 upload = st.file_uploader("Wall photo", type=["jpg", "jpeg", "png"])
 if upload is None:
     st.info("Upload a photo of the wall to start.")

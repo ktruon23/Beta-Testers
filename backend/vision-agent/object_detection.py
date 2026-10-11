@@ -1,5 +1,5 @@
 """
-Vision pipeline for Beta Agents.
+Vision pipeline for Beta Testers.
 
     wall photo -> Roboflow workflow -> parsed holds (box, outline, size, color)
                -> holds.json + annotated image

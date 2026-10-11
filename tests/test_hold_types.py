@@ -15,10 +15,10 @@ from backend.shared.schemas import (
     PlanResponse,
     SolveRequest,
 )
-from backend.tests.conftest import ladder, move
-from backend.tests.test_orchestrator import CLIMBER, api, wire  # noqa: F401  (wire is a fixture)
+from tests.conftest import ladder, move
+from tests.test_orchestrator import CLIMBER, api, wire  # noqa: F401  (wire is a fixture)
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent-viewer"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend" / "agent-viewer"))
 import pipeline  # noqa: E402
 
 client = TestClient(critic.app)
@@ -151,7 +151,7 @@ def test_solve_still_works_when_critic_cannot_grade(wire, monkeypatch):  # noqa:
 
 
 def test_solve_photo_passes_hold_types(wire):  # noqa: F811
-    from backend.tests.test_orchestrator import vision_response
+    from tests.test_orchestrator import vision_response
     holds = [{**h, "color": "red"} for h in unknown_ladder(4)]
     wire["vision"] = vision_response(holds)
     out = api.post("/solve_photo", json={"image_b64": "x", "climber": CLIMBER, "hold_types": {"1": "pocket"}}).json()

@@ -4,8 +4,9 @@ Agents never import each other's code -- they only send these JSON shapes
 over HTTP. New Planner Agent fields are optional for backward compatibility.
 """
 
+import math
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Hold types the agents understand. The camera usually can't tell them apart, so
 # any hold Vision can't classify is treated as DEFAULT_HOLD_TYPE unless the user says otherwise.
@@ -216,6 +217,33 @@ class GripPick(BaseModel):
         return v.strip().lower() if isinstance(v, str) else v
 
 
+MIN_SCALE_PX = 20  # two taps closer than this are too short to measure from
+
+
+class ScaleRef(BaseModel):
+    """Two points tapped on the photo (image pixels) and the real distance between them.
+
+    Usually the bottom and top of the wall plus its height. Overrides Vision's hold-size estimate.
+    """
+    a: tuple[float, float]
+    b: tuple[float, float]
+    inches: float = Field(..., gt=0)
+
+    @property
+    def pixels(self) -> float:
+        return math.hypot(self.b[0] - self.a[0], self.b[1] - self.a[1])
+
+    @property
+    def inches_per_pixel(self) -> float:
+        return self.inches / self.pixels
+
+    @model_validator(mode="after")
+    def _far_enough(self):
+        if self.pixels < MIN_SCALE_PX:
+            raise ValueError(f"The two scale points must be at least {MIN_SCALE_PX} px apart.")
+        return self
+
+
 class SolvePhotoRequest(BaseModel):
     """Photo in, route out: Vision -> color filter -> Planner/Critic loop -> Coach."""
     image_b64: str
@@ -227,6 +255,7 @@ class SolvePhotoRequest(BaseModel):
     start_point: Optional[tuple[float, float]] = None
     finish_point: Optional[tuple[float, float]] = None
     inches_per_pixel: Optional[float] = Field(None, gt=0)  # overrides Vision's estimate
+    scale_ref: Optional[ScaleRef] = None        # the user's measurement; wins over inches_per_pixel
     min_conf: float = Field(0.5, ge=0, le=1)
     max_rounds: int = Field(4, ge=1, le=8)
     hold_types: dict[int, HoldType] = Field(default_factory=dict)  # ids refer to the filtered hold list

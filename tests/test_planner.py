@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 import planner
 from backend.shared.schemas import Climber, Hold, PlanRequest
-from backend.tests.conftest import ladder
+from tests.conftest import ladder
 
 client = TestClient(planner.app)
 
@@ -95,3 +95,13 @@ def test_plan_endpoint_no_route():
     holds = [Hold(id=0, x=0, y=1000), Hold(id=1, x=0, y=100)]
     out = client.post("/plan", json=req(holds).model_dump()).json()
     assert out["ok"] is False and out["error"]
+
+
+def test_short_wingspan_is_accepted_and_explains_when_nothing_is_reachable():
+    # A 20 in wingspan is valid (reach = 17 in). 20 in rungs are out of reach, 10 in rungs are not.
+    short = Climber(height_in=66, wingspan_in=20)
+    far = planner.plan_route(req(ladder(4), climber=short))
+    assert not far["ok"]
+    assert "out of reach" in far["error"] and "17 in" in far["error"]
+    close = planner.plan_route(req(ladder(4, spacing_px=50), climber=short))
+    assert close["ok"] and close["path"] == [0, 1, 2, 3]

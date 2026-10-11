@@ -28,7 +28,7 @@ body {
   min-height: 100vh;
   background: var(--chalk);
   color: var(--ink);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 button,
@@ -51,8 +51,8 @@ a:focus-visible {
 }
 
 .site-header {
-  width: min(1500px, calc(100% - 64px));
-  min-height: 76px;
+  width: min(1240px, calc(100% - 48px));
+  min-height: 54px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -66,32 +66,32 @@ a:focus-visible {
   gap: 10px;
   color: var(--ink);
   text-decoration: none;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 .wordmark-mark {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border-radius: 50% 45% 52% 40%;
   transform: rotate(-7deg);
   background: var(--orange);
   color: white;
-  font-size: 21px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 .site-header nav {
   display: flex;
-  gap: 30px;
+  gap: 22px;
 }
 
 .site-header nav a {
   color: #514e49;
   text-decoration: none;
-  font-size: 15px;
+  font-size: 13px;
   transition: color 180ms ease;
 }
 
@@ -106,26 +106,26 @@ main {
 .intro,
 .route-section,
 .beta-section {
-  width: min(1500px, calc(100% - 64px));
+  width: min(1240px, calc(100% - 48px));
   margin: 0 auto;
 }
 
 .intro {
-  padding: 82px 0 120px;
+  padding: 32px 0 56px;
 }
 
 .intro-copy {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 50px;
-  margin-bottom: 50px;
+  gap: 32px;
+  margin-bottom: 22px;
 }
 
 .intro h1 {
   max-width: 760px;
   margin: 0;
-  font-size: clamp(54px, 7vw, 104px);
+  font-size: clamp(32px, 3.6vw, 50px);
   font-weight: 600;
   line-height: 0.96;
   letter-spacing: -0.055em;
@@ -135,20 +135,20 @@ main {
   max-width: 440px;
   margin: 0 0 5px;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1.55;
 }
 
 .wall-setup {
   display: grid;
-  grid-template-columns: minmax(0, 1.9fr) minmax(330px, 0.62fr);
-  min-height: 580px;
+  grid-template-columns: minmax(0, 1.9fr) minmax(300px, 0.62fr);
+  min-height: 440px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
 .wall-upload {
-  min-height: 580px;
+  min-height: 440px;
   position: relative;
   overflow: hidden;
   border: 0;
@@ -175,10 +175,10 @@ main {
   position: absolute;
   right: 22px;
   bottom: 20px;
-  padding: 9px 13px;
+  padding: 6px 10px;
   background: var(--chalk);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -193,19 +193,19 @@ main {
 }
 
 .upload-symbol {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   border: 2px solid var(--ink);
   border-radius: 50%;
-  font-size: 34px;
+  font-size: 26px;
   font-weight: 400;
 }
 
 .upload-prompt strong {
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 600;
 }
 
@@ -226,46 +226,46 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 54px;
+  padding: 24px 28px;
   background: #e9d8bd;
 }
 
 .profile-form h2 {
-  margin: 0 0 10px;
-  font-size: 30px;
+  margin: 0 0 6px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.025em;
 }
 
 .profile-form > p {
-  margin: 0 0 40px;
+  margin: 0 0 16px;
   color: #5f574c;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
 .profile-form label {
   display: block;
-  margin-bottom: 25px;
+  margin-bottom: 12px;
 }
 
 .profile-form label > span {
   display: block;
-  margin-bottom: 9px;
-  font-size: 16px;
+  margin-bottom: 2px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .profile-form input,
 .profile-form select {
   width: 100%;
-  height: 50px;
+  height: 34px;
   border: 0;
   border-bottom: 1px solid #7c7060;
   border-radius: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 18px;
+  font-size: 15px;
   appearance: none;
 }
 
@@ -274,19 +274,19 @@ main {
     linear-gradient(45deg, transparent 50%, var(--ink) 50%),
     linear-gradient(135deg, var(--ink) 50%, transparent 50%);
   background-position:
-    calc(100% - 16px) 22px,
-    calc(100% - 11px) 22px;
+    calc(100% - 16px) 15px,
+    calc(100% - 11px) 15px;
   background-size: 5px 5px;
   background-repeat: no-repeat;
 }
 
 .orange-button {
-  height: 54px;
-  margin-top: 18px;
+  height: 40px;
+  margin-top: 12px;
   border: 0;
   background: var(--orange);
   color: #fff;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -303,7 +303,7 @@ main {
 }
 
 .route-section {
-  padding: 110px 0 120px;
+  padding: 40px 0 48px;
   border-top: 1px solid var(--line);
 }
 
@@ -311,13 +311,13 @@ main {
   display: grid;
   grid-template-columns: minmax(260px, 0.8fr) minmax(300px, 1.2fr);
   align-items: end;
-  gap: 50px;
-  margin-bottom: 38px;
+  gap: 32px;
+  margin-bottom: 18px;
 }
 
 .section-heading h2 {
   margin: 0;
-  font-size: clamp(42px, 5vw, 70px);
+  font-size: clamp(26px, 2.6vw, 36px);
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.045em;
@@ -327,13 +327,13 @@ main {
   max-width: 510px;
   margin: 0 0 4px;
   color: var(--muted);
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
 .route-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2.1fr) minmax(320px, 0.72fr);
+  grid-template-columns: minmax(0, 2.1fr) minmax(290px, 0.72fr);
   gap: 0;
   align-items: start;
 }
@@ -343,8 +343,8 @@ main {
 }
 
 .route-wall {
-  height: min(72vh, 760px);
-  min-height: 580px;
+  height: min(62vh, 600px);
+  min-height: 400px;
   position: relative;
   overflow: hidden;
   background: #cab99f;
@@ -388,8 +388,8 @@ main {
 .route-point {
   position: absolute;
   z-index: 3;
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   transform: translate(-50%, -50%) rotate(-2deg);
   border: 3px solid var(--orange);
   border-radius: 50%;
@@ -407,14 +407,14 @@ main {
 }
 
 .route-point > span {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .route-point small {
   position: absolute;
-  left: 36px;
-  top: 8px;
+  left: 30px;
+  top: 5px;
   padding: 1px 4px;
   background: rgba(246, 243, 238, 0.9);
   color: var(--ink);
@@ -479,24 +479,24 @@ main {
 
 .sketch-path,
 .sketch-highlight {
+  /* --len is the line's measured length (photo pixels), set by useStrokeLength. No
+     pathLength or non-scaling-stroke: together they drew routes short on some screens.
+     SketchLayer sets stroke widths in photo pixels instead. */
   fill: none;
-  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
+  stroke-dasharray: var(--len, 100000);
+  stroke-dashoffset: var(--len, 0);
   animation: sketch-draw 1s ease-out forwards;
 }
 
 .sketch-path {
   stroke: var(--orange);
-  stroke-width: 4;
   animation-timing-function: linear;
 }
 
 .sketch-highlight {
   stroke: var(--ink);
-  stroke-width: 7;
   animation-duration: 0.5s;
   filter: drop-shadow(0 0 2px rgba(246, 243, 238, 0.9));
 }
@@ -826,10 +826,10 @@ main {
 }
 
 .round-tabs {
-  min-height: 62px;
+  min-height: 42px;
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 20px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -840,7 +840,7 @@ main {
   padding: 3px 0 0;
   background: transparent;
   color: #77716a;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   transition:
     color 180ms ease,
@@ -860,17 +860,17 @@ main {
 }
 
 .conversation {
-  padding: 5px 0 0 48px;
+  padding: 0 0 0 28px;
 }
 
 .conversation-heading {
-  padding-bottom: 27px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
 
 .conversation-heading h2 {
-  margin: 0 0 9px;
-  font-size: 28px;
+  margin: 0 0 4px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -878,15 +878,15 @@ main {
 .conversation-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .message {
   display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 12px;
-  margin-top: 27px;
+  grid-template-columns: 30px 1fr;
+  gap: 10px;
+  margin-top: 14px;
   animation: message-in 180ms ease both;
 }
 
@@ -902,14 +902,14 @@ main {
 }
 
 .agent-avatar {
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: #ddd7ce;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -919,23 +919,23 @@ main {
 
 .message b {
   display: block;
-  margin: 1px 0 6px 4px;
-  font-size: 14px;
+  margin: 1px 0 4px 4px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .message p {
   margin: 0;
-  padding: 13px 15px;
-  border-radius: 4px 18px 18px 18px;
+  padding: 8px 11px;
+  border-radius: 4px 14px 14px 14px;
   background: #e8e4de;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .conversation-note {
-  margin: 38px 0 0 50px;
-  padding-top: 20px;
+  margin: 18px 0 0 40px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 14px;
@@ -943,7 +943,7 @@ main {
 }
 
 .beta-section {
-  padding: 110px 0 125px;
+  padding: 40px 0 56px;
   border-top: 1px solid var(--line);
 }
 
@@ -960,13 +960,13 @@ main {
 
 .move-list button {
   width: 100%;
-  min-height: 100px;
+  min-height: 56px;
   display: grid;
-  grid-template-columns: 70px 1fr 50px;
+  grid-template-columns: 48px 1fr 50px;
   align-items: center;
-  gap: 22px;
+  gap: 14px;
   border: 0;
-  padding: 20px 16px 20px 0;
+  padding: 10px 12px 10px 0;
   background: transparent;
   color: var(--ink);
   text-align: left;
@@ -981,7 +981,7 @@ main {
 
 .move-index {
   color: #9d958b;
-  font-size: 34px;
+  font-size: 22px;
   font-weight: 500;
   text-align: center;
 }
@@ -991,7 +991,7 @@ main {
 }
 
 .move-copy {
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -1005,57 +1005,68 @@ main {
   font-weight: 600;
 }
 
+/* Other routes: a bar above the route photo, as chips so it's easy to spot. */
 .alternatives {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 20px;
-  padding-top: 38px;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-left: 3px solid var(--orange);
+  background: #ece5da;
 }
 
 .alternatives > span {
-  font-size: 17px;
+  margin-right: 4px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .alternatives button {
-  border: 0;
-  border-bottom: 1px solid #8d8780;
-  padding: 3px 0;
-  background: transparent;
-  color: #57524c;
-  font-size: 16px;
+  border: 1px solid #8d8780;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--chalk);
+  color: var(--ink);
+  font-size: 13px;
   cursor: pointer;
   transition:
     color 180ms ease,
+    background 180ms ease,
     border-color 180ms ease;
 }
 
-.alternatives button:hover,
-.alternatives button.active {
+.alternatives button:hover {
   border-color: var(--orange);
   color: var(--orange);
 }
 
+.alternatives button.active {
+  border-color: var(--orange);
+  background: var(--orange);
+  color: #fff;
+}
+
 footer {
-  min-height: 160px;
+  min-height: 72px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 30px;
-  padding: 30px max(32px, calc((100vw - 1500px) / 2));
+  padding: 20px max(24px, calc((100vw - 1240px) / 2));
   background: #d9bd96;
 }
 
 footer span {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 footer p {
   margin: 0;
   color: #575047;
-  font-size: 15px;
+  font-size: 13px;
 }
 
 /* ---- live data additions ---- */
@@ -1196,7 +1207,7 @@ footer p {
 }
 
 .health-banner {
-  width: min(1500px, calc(100% - 64px));
+  width: min(1240px, calc(100% - 48px));
   margin: 12px auto 0;
   padding: 10px 14px;
   border-left: 3px solid var(--orange);
@@ -1208,11 +1219,11 @@ footer p {
 .grade-badge {
   display: inline-block;
   margin-left: 14px;
-  padding: 4px 10px;
+  padding: 3px 8px;
   vertical-align: middle;
   background: var(--ink);
   color: var(--chalk);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -1267,7 +1278,7 @@ footer p {
 }
 
 .conversation-scroll {
-  max-height: min(60vh, 640px);
+  max-height: min(55vh, 520px);
   overflow-y: auto;
 }
 
@@ -1320,7 +1331,7 @@ footer p {
   }
 
   .site-header {
-    min-height: 64px;
+    min-height: 50px;
   }
 
   .site-header nav {
@@ -1328,21 +1339,21 @@ footer p {
   }
 
   .intro {
-    padding: 55px 0 80px;
+    padding: 24px 0 40px;
   }
 
   .intro h1 {
-    font-size: clamp(48px, 15vw, 68px);
+    font-size: clamp(30px, 9vw, 42px);
     line-height: 0.98;
   }
 
   .intro-copy {
-    gap: 25px;
-    margin-bottom: 36px;
+    gap: 12px;
+    margin-bottom: 20px;
   }
 
   .intro-copy p {
-    font-size: 17px;
+    font-size: 14px;
   }
 
   .wall-setup {
@@ -1352,28 +1363,28 @@ footer p {
 
   .wall-upload {
     width: calc(100% + 32px);
-    min-height: 440px;
+    min-height: 340px;
     margin-left: -16px;
     border: 0;
   }
 
   .profile-form {
     margin: 0 -16px;
-    padding: 42px 24px 48px;
+    padding: 22px 16px 28px;
   }
 
   .section-heading {
     display: block;
-    margin-bottom: 28px;
+    margin-bottom: 14px;
   }
 
   .section-heading h2 {
-    margin-bottom: 18px;
+    margin-bottom: 8px;
   }
 
   .route-section {
     width: 100%;
-    padding: 75px 0 80px;
+    padding: 32px 0 40px;
   }
 
   .route-section > .section-heading {
@@ -1385,8 +1396,8 @@ footer p {
   }
 
   .route-wall {
-    height: 72vh;
-    min-height: 520px;
+    height: 60vh;
+    min-height: 380px;
   }
 
   .route-wall > img {
@@ -1403,7 +1414,7 @@ footer p {
   }
 
   .conversation {
-    padding: 62px 16px 0;
+    padding: 28px 16px 0;
   }
 
   .conversation-note {
@@ -1411,22 +1422,22 @@ footer p {
   }
 
   .beta-section {
-    padding: 78px 0 85px;
+    padding: 32px 0 40px;
   }
 
   .move-list button {
-    min-height: 120px;
-    grid-template-columns: 44px 1fr;
+    min-height: 64px;
+    grid-template-columns: 40px 1fr;
     gap: 10px;
     padding: 20px 5px 20px 0;
   }
 
   .move-index {
-    font-size: 27px;
+    font-size: 20px;
   }
 
   .move-copy {
-    font-size: 17px;
+    font-size: 14px;
   }
 
   .move-list small {
@@ -1434,16 +1445,15 @@ footer p {
   }
 
   .alternatives {
-    align-items: flex-start;
-    flex-direction: column;
+    margin: 0 16px 10px;
   }
 
   footer {
-    min-height: 170px;
+    min-height: 80px;
     align-items: flex-start;
     flex-direction: column;
     justify-content: center;
-    padding: 35px 16px;
+    padding: 20px 16px;
   }
 
   footer p {
@@ -1462,4 +1472,69 @@ footer p {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---- wall scale: two taps on the photo plus the real distance between them ---- */
+.scale-catcher {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  cursor: crosshair;
+}
+
+.scale-line {
+  stroke: var(--orange);
+  stroke-width: 3;
+  stroke-dasharray: 10 8;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px rgba(246, 243, 238, 0.9));
+}
+
+.scale-dot {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border: 3px solid var(--orange);
+  border-radius: 50%;
+  background: var(--chalk);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+  animation: sketch-pop 220ms ease-out both;
+}
+
+.profile-form .scale-bar label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 0 0;
+}
+
+.profile-form .scale-bar label > span {
+  margin: 0;
+  font-size: 14px;
+}
+
+.profile-form .scale-bar input {
+  width: 7em;
+  height: 36px;
+  font-size: 16px;
+}
+
+.scale-error {
+  flex-basis: 100%;
+  color: #c62f12;
+}
+
+.photo-actions {
+  position: absolute;
+  z-index: 8;
+  right: 22px;
+  bottom: 20px;
+  display: flex;
+  gap: 8px;
+}
+
+.photo-actions .replace-photo {
+  position: static;
 }

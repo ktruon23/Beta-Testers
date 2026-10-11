@@ -1,6 +1,6 @@
-# Beta Agents frontend
+# Beta Testers frontend
 
-React + Vite page for the Beta Agents route planner. It started from the Figma Make design and now calls the orchestrator for real results.
+React + Vite page for the Beta Testers route planner. It started from the Figma Make design and now calls the orchestrator for real results.
 
 ## Run it
 
