@@ -13,16 +13,23 @@ The flow:
 """
 
 import os
+import sys
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException
 
-from shared.schemas import (
+# Make the repo root importable so `shared` works however this file is launched.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from shared.schemas import (  # noqa: E402
     CoachResponse,
     CritiqueResponse,
     DetectRequest,
     DetectResponse,
     PlanResponse,
+    Hold,
+    SolvePhotoRequest,
     SolveRequest,
     SolveResponse,
     TraceEntry,
@@ -179,3 +186,53 @@ def solve(req: SolveRequest):
         ok=True, status=status, holds=req.holds, start_id=start_id, finish_id=finish_id,
         plan=last_good, critic_approved=approved, beta=beta, trace=trace, rounds=rounds,
     )
+
+
+@app.post("/solve_photo", response_model=SolveResponse)
+def solve_photo(req: SolvePhotoRequest):
+    """Photo in, route out: Vision -> route-color filter -> /solve (Planner <-> Critic, Coach)."""
+    vision_trace: list[TraceEntry] = []
+
+    def log(sender, receiver, summary, payload=None):
+        vision_trace.append(TraceEntry(step=len(vision_trace) + 1, sender=sender, receiver=receiver,
+                                       summary=summary, payload=payload or {}))
+
+    log("Orchestrator", "Vision", "Detect the holds in this photo.")
+    with httpx.Client(timeout=TIMEOUT) as client:
+        det = DetectResponse(**send(client, f"{VISION_URL}/detect",
+                                    DetectRequest(image_b64=req.image_b64, min_conf=req.min_conf).model_dump()))
+    log("Vision", "Orchestrator",
+        f"Found {len(det.holds)} holds ({det.method}); colors {det.colors}; "
+        f"scale {det.inches_per_pixel} in/px ({det.scale_method})",
+        {"colors": det.colors, "inches_per_pixel": det.inches_per_pixel, "scale_method": det.scale_method})
+
+    holds = det.holds
+    if req.route_color:
+        wanted = req.route_color.strip().lower()
+        holds = [h for h in holds if (h.color or "").lower() == wanted]
+        if len(holds) < 2:
+            raise HTTPException(400, f"Only {len(holds)} '{wanted}' holds detected. "
+                                     f"Detected colors: {det.colors}")
+        # Renumber 0..n-1 (still bottom to top) so start/finish ids refer to this route's holds.
+        holds = [Hold(id=i, x=h.x, y=h.y, type=h.type, color=h.color) for i, h in enumerate(holds)]
+        log("Orchestrator", "Orchestrator", f"Kept {len(holds)} {wanted} holds for the route.")
+
+    ipp = req.inches_per_pixel or det.inches_per_pixel
+    if not ipp:
+        raise HTTPException(400, "No scale available: pass inches_per_pixel.")
+
+    result = solve(SolveRequest(
+        holds=holds,
+        start_id=req.start_id,
+        finish_id=req.finish_id,
+        inches_per_pixel=ipp,
+        climber=req.climber,
+        max_rounds=req.max_rounds,
+    ))
+
+    # One continuous trace: Vision messages first, then the Planner/Critic/Coach rounds.
+    offset = len(vision_trace)
+    for entry in result.trace:
+        entry.step += offset
+    result.trace = vision_trace + result.trace
+    return result

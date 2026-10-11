@@ -1,3 +1,11 @@
 fastapi
 uvicorn[standard]
+httpx
+pydantic
 anthropic
+opencv-python
+numpy
+python-dotenv
+inference-sdk
+streamlit
+pillow

@@ -40,6 +40,8 @@ class Move(BaseModel):
 
 class DetectRequest(BaseModel):
     image_b64: str
+    min_conf: float = Field(0.5, ge=0, le=1, description="Drop detections below this confidence")
+    # Legacy OpenCV color-blob settings; unused by the Roboflow detector.
     sat_threshold: int = 90
     min_area_frac: float = 0.00015
     max_area_frac: float = 0.03
@@ -50,6 +52,9 @@ class DetectResponse(BaseModel):
     image_width: int
     image_height: int
     method: str
+    inches_per_pixel: Optional[float] = None  # estimated from median hold size
+    scale_method: Optional[str] = None        # "median-hold-size" | "fallback-wall-height"
+    colors: dict[str, int] = Field(default_factory=dict)  # hold count per color, for the route-color picker
 
 
 class CriticFeedback(BaseModel):
@@ -144,6 +149,18 @@ class SolveRequest(BaseModel):
     finish_id: Optional[int] = None
     inches_per_pixel: float = Field(..., gt=0)
     climber: Climber
+    max_rounds: int = Field(4, ge=1, le=8)
+
+
+class SolvePhotoRequest(BaseModel):
+    """Photo in, route out: Vision -> color filter -> Planner/Critic loop -> Coach."""
+    image_b64: str
+    climber: Climber
+    route_color: Optional[str] = None           # keep only holds of this color; None = all holds
+    start_id: Optional[int] = None              # ids refer to the filtered hold list
+    finish_id: Optional[int] = None
+    inches_per_pixel: Optional[float] = Field(None, gt=0)  # overrides Vision's estimate
+    min_conf: float = Field(0.5, ge=0, le=1)
     max_rounds: int = Field(4, ge=1, le=8)
 
 

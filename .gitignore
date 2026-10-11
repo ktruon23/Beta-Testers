@@ -1,0 +1,14 @@
+# VISION AGENT
+
+.write_test
+output/
+__pycache__/
+test.jpg
+
+
+# EXTRAS
+.vscode/
+.env
+
+.gitignore
+requirements.txt
