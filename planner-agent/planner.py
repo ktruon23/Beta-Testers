@@ -42,12 +42,42 @@ PRESETS: dict[str, dict[str, float]] = {
     "efficient": {"move": 3.0, "reach": 2.0, "hold_type": 0.5},
 }
 
+# How the climber's level changes the search. Intermediate is the neutral baseline.
+# reach_cap: fraction of full reach a single move may use (hard limit).
+# weight_scale: multiplies the strategy weights for move count, reach and hold type.
+# extra_hold_penalty: added on top of HOLD_PENALTY for holds that are hard for this level.
+LEVEL_PROFILES: dict[str, dict[str, Any]] = {
+    "beginner": {
+        "reach_cap": 0.8,
+        "weight_scale": {"move": 0.75, "reach": 2.0, "hold_type": 2.0},
+        "extra_hold_penalty": {"crimp": 0.6, "sloper": 0.6, "pocket": 0.4},
+        "default_strategy": "safe",
+    },
+    "intermediate": {
+        "reach_cap": 1.0,
+        "weight_scale": {"move": 1.0, "reach": 1.0, "hold_type": 1.0},
+        "extra_hold_penalty": {},
+        "default_strategy": "balanced",
+    },
+    "expert": {
+        "reach_cap": 1.0,
+        "weight_scale": {"move": 1.5, "reach": 0.5, "hold_type": 0.5},
+        "extra_hold_penalty": {},
+        "default_strategy": "efficient",
+    },
+}
+
+
+def level_profile(level: str | None) -> dict[str, Any]:
+    return LEVEL_PROFILES.get((level or "intermediate").lower(), LEVEL_PROFILES["intermediate"])
+
+
 SYSTEM = """You are the decision-making layer of a climbing route Planner Agent.
 The Python tools are authoritative for all geometry, distances, reach ratios,
 and route paths. Never calculate or invent geometry yourself.
 
 Choose a strategy appropriate to the climber: beginners generally need shorter,
-safer moves; advanced climbers may prefer fewer moves. Compare at least two
+safer moves; expert climbers may prefer fewer moves. Compare at least two
 candidate routes when possible. If no route exists, diagnose the gap with
 find_gaps. Then submit a path that exactly matches one of the tool results, with
 brief reasoning. If critic feedback makes the constrained route much worse, use
@@ -111,12 +141,15 @@ def make_move(a: Hold, b: Hold, ipp: float, reach_in: float) -> Move:
     )
 
 
-def _cost(move: Move, weights: dict[str, float]) -> float:
-    penalty = HOLD_PENALTY.get(move.to_type.lower(), HOLD_PENALTY["unknown"])
+def _cost(move: Move, weights: dict[str, float], profile: dict[str, Any] | None = None) -> float:
+    profile = profile or LEVEL_PROFILES["intermediate"]
+    scale = profile["weight_scale"]
+    hold = move.to_type.lower()
+    penalty = HOLD_PENALTY.get(hold, HOLD_PENALTY["unknown"]) + profile["extra_hold_penalty"].get(hold, 0.0)
     return (
-        weights["move"] * 1.0
-        + weights["reach"] * (move.reach_ratio**2)
-        + weights["hold_type"] * penalty
+        weights["move"] * scale["move"]
+        + weights["reach"] * scale["reach"] * (move.reach_ratio**2)
+        + weights["hold_type"] * scale["hold_type"] * penalty
     )
 
 
@@ -126,7 +159,31 @@ def plan_route(
     avoid_holds: list[int] | None = None,
     avoid_moves: list[list[int]] | None = None,
 ) -> dict[str, Any]:
-    """Deterministic Dijkstra tool. Returns a path plus exact move measurements."""
+    """Deterministic Dijkstra tool. Returns a path plus exact move measurements.
+
+    The climber's level scales the cost weights and, for beginners, caps how much of
+    their reach a single move may use. If the cap leaves no route, it is relaxed to
+    full reach and the result says so (level_cap_relaxed).
+    """
+    profile = level_profile(getattr(req.climber, "level", None))
+    result = _search(req, weights, avoid_holds, avoid_moves, profile, profile["reach_cap"])
+    if not result["ok"] and profile["reach_cap"] < 1.0 and "closest_reachable_id" in result:
+        relaxed = _search(req, weights, avoid_holds, avoid_moves, profile, 1.0)
+        if relaxed["ok"]:
+            relaxed["level_cap_relaxed"] = True
+            return relaxed
+    result.setdefault("level_cap_relaxed", False)
+    return result
+
+
+def _search(
+    req: PlanRequest,
+    weights: dict[str, float] | None,
+    avoid_holds: list[int] | None,
+    avoid_moves: list[list[int]] | None,
+    profile: dict[str, Any],
+    reach_cap: float,
+) -> dict[str, Any]:
     weights = weights or PRESETS["balanced"]
     avoided_holds = set(req.avoid_holds if avoid_holds is None else avoid_holds)
     avoided_moves = {
@@ -135,6 +192,7 @@ def plan_route(
     }
     by_id = {h.id: h for h in req.holds}
     reach_in = req.climber.reach_in
+    move_limit = reach_in * reach_cap
 
     if req.start_id not in by_id or req.finish_id not in by_id:
         return {"ok": False, "error": "Start or finish hold ID was not found.", "path": [], "moves": [], "total_cost": 0.0, "reach_in": reach_in}
@@ -154,8 +212,8 @@ def plan_route(
                 continue
             move = make_move(a, b, req.inches_per_pixel, reach_in)
             exact_distance = math.hypot((b.x - a.x) * req.inches_per_pixel, (a.y - b.y) * req.inches_per_pixel)
-            if exact_distance <= reach_in + 1e-9:
-                moves_by_from[a.id].append((b.id, move, _cost(move, weights)))
+            if exact_distance <= move_limit + 1e-9:
+                moves_by_from[a.id].append((b.id, move, _cost(move, weights, profile)))
 
     best: dict[int, float] = {req.start_id: 0.0}
     came_from: dict[int, tuple[int, Move]] = {}
@@ -187,7 +245,7 @@ def plan_route(
         )
         return {
             "ok": False,
-            "error": f"No route reaches finish hold #{req.finish_id}. Closest reachable hold is #{closest}, {gap_distance:.1f} in from the finish (max reach {reach_in:.1f} in).",
+            "error": f"No route reaches finish hold #{req.finish_id}. Closest reachable hold is #{closest}, {gap_distance:.1f} in from the finish (max move {move_limit:.1f} in).",
             "path": [], "moves": [], "total_cost": 0.0, "reach_in": reach_in,
             "closest_reachable_id": closest, "gap_distance_in": round(gap_distance, 2),
         }
@@ -212,6 +270,7 @@ def plan_route(
         "move_count": len(moves),
         "worst_hold_type": max(moves, key=lambda m: m.reach_ratio).to_type if moves else "none",
         "strategy_weights": weights,
+        "move_limit_in": round(move_limit, 2),
     }
 
 
@@ -277,24 +336,29 @@ def _candidate_summary(result: dict[str, Any], strategy: str) -> dict[str, Any]:
     }
 
 
-def _deterministic_response(req: PlanRequest, reason: str = "Claude unavailable; balanced deterministic planner used.") -> PlanResponse:
-    balanced = plan_route(req, PRESETS["balanced"])
+def _deterministic_response(req: PlanRequest, reason: str | None = None) -> PlanResponse:
+    level = getattr(req.climber, "level", None) or "intermediate"
+    default = level_profile(level)["default_strategy"]
+    reason = reason or f"Claude unavailable; {default} deterministic planner used ({level} climber)."
+    balanced = plan_route(req, PRESETS[default])
     if not balanced["ok"]:
         gaps = find_gaps(req)
         diagnostic = gaps.get("diagnosis") or balanced.get("error") or "No reachable route was found."
         return PlanResponse(
             ok=False, path=[], moves=[], reach_in=req.climber.reach_in,
-            total_cost=0.0, error=diagnostic, strategy="balanced",
+            total_cost=0.0, error=diagnostic, strategy=default,
             reasoning=f"{reason} {diagnostic}", alternatives=[], pushback=None, source="deterministic",
         )
+    if balanced.get("level_cap_relaxed"):
+        reason += " No route fit the beginner reach limit, so full reach was allowed."
     alternatives = []
-    for name in ("safe", "efficient"):
+    for name in (n for n in PRESETS if n != default):
         candidate = plan_route(req, PRESETS[name])
         if candidate["ok"] and candidate["path"] != balanced["path"]:
             alternatives.append(PlanAlternative(**_candidate_summary(candidate, name)))
     return PlanResponse(
         ok=True, path=balanced["path"], moves=balanced["moves"], reach_in=req.climber.reach_in,
-        total_cost=balanced["total_cost"], error=None, strategy="balanced", reasoning=reason,
+        total_cost=balanced["total_cost"], error=None, strategy=default, reasoning=reason,
         alternatives=alternatives, pushback=None, source="deterministic",
     )
 
@@ -337,6 +401,7 @@ def _llm_plan(req: PlanRequest) -> PlanResponse:
     user_context = {
         "request": req.model_dump(),
         "climber_level": level,
+        "level_profile": level_profile(level),
         "critic_feedback": feedback.model_dump() if hasattr(feedback, "model_dump") else feedback,
         "available_presets": PRESETS,
         "tool_results_so_far": tool_results,
@@ -385,7 +450,7 @@ def _llm_plan(req: PlanRequest) -> PlanResponse:
             tool_results.append({"tool": "invalid_action", "result": "Unknown action. Choose a documented action."})
 
     if last_error:
-        return _deterministic_response(req, last_error + "; balanced deterministic fallback used.")
+        return _deterministic_response(req, last_error + "; deterministic fallback used.")
 
     valid_candidates = {k: v for k, v in candidates.items() if v.get("ok")}
     if not valid_candidates:

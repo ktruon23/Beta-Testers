@@ -21,6 +21,7 @@ def estimate_scale(predictions: list[dict], image_height_px: int,
         hold_size_px(p) for p in predictions
         if p.get("class_id") == hold_class_id and p.get("confidence", 0) >= MIN_CONF
     ])
+    sizes = sizes[sizes > 0]  # a zero-size box would divide by zero below
 
     if len(sizes) < 10:
         log.warning("Only %d holds, too few to trust; using fallback wall height", len(sizes))

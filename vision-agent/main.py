@@ -41,6 +41,8 @@ def decode_image(image_b64: str) -> np.ndarray:
         buf = np.frombuffer(base64.b64decode(image_b64), np.uint8)
     except ValueError as e:
         raise HTTPException(400, f"image_b64 is not valid base64: {e}") from e
+    if buf.size == 0:  # cv2.imdecode raises on an empty buffer
+        raise HTTPException(400, "image_b64 is empty.")
     img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(400, "Could not decode the image (expected PNG or JPEG).")

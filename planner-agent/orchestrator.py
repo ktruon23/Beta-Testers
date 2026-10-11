@@ -130,7 +130,22 @@ class Run:
         return plan
 
     def critique(self, plan: PlanResponse, rnd: int) -> CritiqueResponse:
-        crit = CritiqueResponse(**send(self.client, f"{CRITIC_URL}/critique", {
+        try:
+            crit = self._critique(plan, rnd)
+        except HTTPException as e:  # Critic down: keep the route, just unreviewed
+            crit = CritiqueResponse(approved=False, source="unavailable",
+                                    reasoning="The Critic is unavailable, so this route wasn't reviewed.")
+            self.log("Critic", "Orchestrator", crit.reasoning, {"error": str(e.detail)})
+            return crit
+        self.critic_feedback = {"reasoning": crit.reasoning, "avoid_holds": crit.avoid_holds,
+                                "avoid_moves": crit.avoid_moves}
+        verdict = "APPROVED" if crit.approved else "REJECTED"
+        self.log("Critic", "Orchestrator", f"{verdict}: {crit.reasoning}",
+                 {"avoid_holds": crit.avoid_holds, "avoid_moves": crit.avoid_moves, "source": crit.source})
+        return crit
+
+    def _critique(self, plan: PlanResponse, rnd: int) -> CritiqueResponse:
+        return CritiqueResponse(**send(self.client, f"{CRITIC_URL}/critique", {
             "plan": plan.model_dump(),
             "holds": [h.model_dump() for h in self.req.holds],
             "climber": self.req.climber.model_dump(),
@@ -140,19 +155,19 @@ class Run:
             "max_rounds": self.req.max_rounds,
             "planner_pushback": plan.pushback.model_dump() if plan.pushback else None,
         }))
-        self.critic_feedback = {"reasoning": crit.reasoning, "avoid_holds": crit.avoid_holds,
-                                "avoid_moves": crit.avoid_moves}
-        verdict = "APPROVED" if crit.approved else "REJECTED"
-        self.log("Critic", "Orchestrator", f"{verdict}: {crit.reasoning}",
-                 {"avoid_holds": crit.avoid_holds, "avoid_moves": crit.avoid_moves, "source": crit.source})
-        return crit
 
     def coach(self, plan: PlanResponse) -> CoachResponse:
-        beta = CoachResponse(**send(self.client, f"{COACH_URL}/beta", {
-            "plan": plan.model_dump(),
-            "holds": [h.model_dump() for h in self.req.holds],
-            "climber": self.req.climber.model_dump(),
-        }))
+        try:
+            beta = CoachResponse(**send(self.client, f"{COACH_URL}/beta", {
+                "plan": plan.model_dump(),
+                "holds": [h.model_dump() for h in self.req.holds],
+                "climber": self.req.climber.model_dump(),
+            }))
+        except HTTPException as e:  # Coach down: still return the route, without beta
+            beta = CoachResponse(summary="The Coach is unavailable, so there is no move-by-move beta yet.",
+                                 steps=[], source="unavailable")
+            self.log("Coach", "Orchestrator", beta.summary, {"error": str(e.detail)})
+            return beta
         self.log("Coach", "Orchestrator", beta.summary, {"source": beta.source})
         return beta
 
@@ -385,6 +400,11 @@ def solve(req: SolveRequest):
     # Default start = lowest hold on the wall, finish = highest (image y grows down)
     start_id = req.start_id if req.start_id in ids else max(req.holds, key=lambda h: h.y).id
     finish_id = req.finish_id if req.finish_id in ids else min(req.holds, key=lambda h: h.y).id
+    if finish_id == start_id and req.finish_id not in ids:
+        # Every hold is at the same height: finish on the one farthest across from the start.
+        start = next(h for h in req.holds if h.id == start_id)
+        others = [h for h in req.holds if h.id != start_id]
+        finish_id = min(others, key=lambda h: (h.y, -abs(h.x - start.x))).id
 
     with httpx.Client(timeout=TIMEOUT) as client:
         run = Run(client, req, start_id, finish_id)
@@ -433,6 +453,10 @@ def solve_photo(req: SolvePhotoRequest):
         {"colors": det.colors, "inches_per_pixel": det.inches_per_pixel, "scale_method": det.scale_method})
 
     holds = det.holds
+    if len(holds) < 2:
+        n = len(holds)
+        raise HTTPException(400, f"Vision found {n} hold{'' if n == 1 else 's'} in the photo. "
+                                 "Try a straight-on photo of the whole wall in good light.")
     if req.route_color:
         wanted = req.route_color.strip().lower()
         holds = [h for h in holds if (h.color or "").lower() == wanted]

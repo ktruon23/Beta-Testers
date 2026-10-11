@@ -1,0 +1,4 @@
+# Test-only dependencies. Install with:  pip install -r requirements-dev.txt
+# Run from the repo root with:           python -m pytest
+-r requirements.txt
+pytest>=8.0

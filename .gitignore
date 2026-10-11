@@ -2,10 +2,10 @@
 
 .write_test
 output/
-test.jpg
 
 
 # EXTRAS
+*.jpg
 .vscode/
 .env
 __pycache__/

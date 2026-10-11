@@ -99,11 +99,14 @@ def predict(
 
             try:
 
-                return client.run_workflow(
+                result = client.run_workflow(
                     workflow_id=WORKFLOW_ID,
                     workspace_name=WORKSPACE_NAME,
                     images={"image": img},
-                )[0].get("model_output").get("predictions")
+                )
+                # No detections can come back as [], {} or None at any level: that's 0 holds, not a crash.
+                output = (result[0] if result else None) or {}
+                return (output.get("model_output") or {}).get("predictions") or []
             
             except HTTPCallErrorError as e:
 
@@ -147,10 +150,3 @@ def predict(
 
     return data
 
-if __name__ == "__main__":
-
-    INPUT_PATH = "test.jpg"
-
-    predictions = predict(INPUT_PATH)
-
-    print(predictions)

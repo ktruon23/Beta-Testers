@@ -125,11 +125,15 @@ def critique(req: CritiqueRequest):
     except Exception as e:  # bad key, network, rate limit... keep the demo alive
         return rule_based(req, f"Claude call failed: {type(e).__name__}")
 
+    # The model can return junk ids (strings, triples, null); keep only well-formed ones.
     protected = {req.start_id, req.finish_id}
+    holds = out.get("avoid_holds") or []
+    moves = out.get("avoid_moves") or []
     return CritiqueResponse(
         approved=bool(out.get("approved")),
         reasoning=str(out.get("reasoning", "")),
-        avoid_holds=[h for h in out.get("avoid_holds", []) if h not in protected],
-        avoid_moves=[p for p in out.get("avoid_moves", []) if len(p) == 2],
+        avoid_holds=[h for h in holds if type(h) is int and h not in protected],
+        avoid_moves=[list(p) for p in moves
+                     if isinstance(p, (list, tuple)) and len(p) == 2 and all(type(x) is int for x in p)],
         source="claude",
     )

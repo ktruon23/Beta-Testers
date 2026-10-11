@@ -17,10 +17,11 @@ class Hold(BaseModel):
 
 
 class Climber(BaseModel):
-    height_in: float = Field(..., gt=0, description="Climber height in inches")
-    wingspan_in: float = Field(..., gt=0, description="Fingertip to fingertip, arms out, in inches")
+    # Upper bounds catch centimeters typed into an inches field (180 cm would be a 153 in reach).
+    height_in: float = Field(..., gt=0, le=108, description="Climber height in inches")
+    wingspan_in: float = Field(..., gt=0, le=120, description="Fingertip to fingertip, arms out, in inches")
     reach_factor: float = Field(0.85, gt=0, le=1.5, description="Max single move = wingspan * reach_factor. Tune this with a real climber.")
-    level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
+    level: Literal["beginner", "intermediate", "expert"] = "intermediate"
 
     @property
     def reach_in(self) -> float:
