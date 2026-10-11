@@ -63,7 +63,7 @@ with st.sidebar:
     st.header("Climber")
     height = st.number_input("Height (in)", 48.0, 90.0, 68.0)
     wingspan = st.number_input("Wingspan (in)", 48.0, 95.0, height)
-    level = st.selectbox("Level", ["beginner", "intermediate", "advanced"], index=1)
+    level = st.selectbox("Level", ["beginner", "intermediate", "expert"], index=1)
     reach_factor = st.slider("Reach factor", 0.6, 1.1, 0.85, 0.01,
                              help="Longest single move = wingspan x reach factor")
     st.caption(f"Longest allowed move: {wingspan * reach_factor:.0f} in")

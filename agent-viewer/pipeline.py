@@ -13,7 +13,8 @@ Every step yields an Event:
     data    raw response, for anything the UI wants to draw
 
 CLI (prints the live log in the terminal):
-    python pipeline.py photo.jpg --color blue --height 68 --wingspan 70
+    cd agent-viewer
+    python pipeline.py wall.jpg --height 68 --wingspan 70 --level beginner
 """
 
 from __future__ import annotations
@@ -238,7 +239,8 @@ if __name__ == "__main__":
     ap.add_argument("--color")
     ap.add_argument("--height", type=float, default=68)
     ap.add_argument("--wingspan", type=float, default=70)
-    ap.add_argument("--level", default="intermediate", choices=["beginner", "intermediate", "advanced"])
+    ap.add_argument("--level", default="intermediate", choices=["beginner", "intermediate", "expert"],
+                    help="Climbing experience: beginner, intermediate or expert")
     ap.add_argument("--rounds", type=int, default=4)
     args = ap.parse_args()
 
