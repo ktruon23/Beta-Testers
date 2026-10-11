@@ -115,7 +115,7 @@ class Run:
         }))
         if plan.ok:
             path_str = " -> ".join(f"#{p}" for p in plan.path)
-            worst = max(m.reach_ratio for m in plan.moves)
+            worst = max((m.reach_ratio for m in plan.moves), default=0.0)
             self.log("Planner", "Critic", f"Proposed {len(plan.moves)} moves: {path_str} "
                      f"(hardest move {worst:.0%} of reach)", {"path": plan.path})
         else:
