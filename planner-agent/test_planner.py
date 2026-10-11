@@ -1,4 +1,4 @@
-from planner import plan_route
+from planner import plan
 from shared.schemas import PlanRequest, Hold, Climber
 
 holds = [
@@ -16,9 +16,9 @@ req = PlanRequest(
     climber=Climber(height_in=66, wingspan_in=68),  # reach = 57.8 in
 )
 
-res = plan_route(req)
+res = plan(req)
 print(res.ok, res.path, res.total_cost, res.error)
 
 # Simulate the Critic: avoid the sloper
 req.avoid_holds = [2]
-print(plan_route(req).path)
+print(plan(req).path)

@@ -20,6 +20,7 @@ import os
 import re
 
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
+MODEL = CLAUDE_MODEL  # older name, still imported by the orchestrator
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "").rstrip("/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")

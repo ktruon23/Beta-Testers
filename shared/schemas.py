@@ -183,3 +183,4 @@ class SolveResponse(BaseModel):
     beta: Optional[CoachResponse] = None
     trace: list[TraceEntry] = Field(default_factory=list)
     rounds: int = 0
+    orchestrator_source: str = "fixed"  # "claude" or "fixed" -- which pipeline ran
